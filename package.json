@@ -1,0 +1,26 @@
+{
+  "name": "ccs",
+  "version": "1.0.0",
+  "description": "ccs_intern",
+  "homepage": "https://github.com/SaurabhPasi28/ccs_intern#readme",
+  "bugs": {
+    "url": "https://github.com/SaurabhPasi28/ccs_intern/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SaurabhPasi28/ccs_intern.git"
+  },
+  "license": "ISC",
+  "author": "Saurabh Pasi",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "client": "npm run dev --prefix frontend",
+    "server": "npm run dev --prefix backend",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "keywords": [],
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
