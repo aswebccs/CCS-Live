@@ -12,6 +12,9 @@ const companyRoutes = require("./routes/companyRoutes");
 const schoolRoutes = require("./routes/schoolRoutes");
 const universityRoutes = require("./routes/universityRoutes");
 const skillTestRoutes = require("./routes/Skilltestroutes");
+const examManagementRoutes = require("./routes/examManagementRoutes");
+const geoRoutes = require("./routes/geoRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const app = express();
 
 // app.use(
@@ -43,6 +46,9 @@ app.use("/api/company", companyRoutes);
 app.use("/api/school", schoolRoutes);
 app.use("/api/university", universityRoutes);
 app.use("/api/skill-tests", skillTestRoutes);
+app.use("/api/exam-management", examManagementRoutes);
+app.use("/api/geo", geoRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.listen(process.env.PORT || 5000, () => {
   console.log(`Server running on port ${process.env.PORT || 5000}`);

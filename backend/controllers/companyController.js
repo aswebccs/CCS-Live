@@ -990,7 +990,7 @@ exports.saveCompanyPost = async (req, res) => {
                 job.location_qual,
                 job.travel,
                 job.custom_benefits,
-                job.status || "draft"
+                job.status || "paused"
             ]
         );
 
@@ -1107,7 +1107,7 @@ exports.updateCompanyPost = async (req, res) => {
         }
 
         // Validate status if provided
-        const validStatuses = ['draft', 'published', 'closed'];
+        const validStatuses = ['paused', 'published', 'closed', 'reopen'];
         if (status && !validStatuses.includes(status.toLowerCase())) {
             return res.status(400).json({
                 message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`

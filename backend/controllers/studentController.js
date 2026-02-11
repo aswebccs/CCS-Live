@@ -803,11 +803,6 @@ exports.applyJob = [
                 );
 
                 resumeUrl = resumeResult.secure_url;
-            } else {
-                return res.status(400).json({
-                    success: false,
-                    message: "Resume is required",
-                });
             }
 
             // ✅ INSERT APPLICATION

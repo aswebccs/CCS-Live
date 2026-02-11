@@ -1,6 +1,229 @@
+// import React, { useState, useEffect } from 'react';
+// import { useNavigate } from 'react-router-dom';
+// import { Users, UserPlus, Briefcase, CheckCircle, TrendingUp, GraduationCap, School, Building2, ArrowRight } from 'lucide-react';
+
+// const CountUp = ({ end, duration = 2000, suffix = '' }) => {
+//   const [count, setCount] = useState(0);
+//   useEffect(() => {
+//     let startTime;
+//     let animationFrame;
+//     const animate = (currentTime) => {
+//       if (!startTime) startTime = currentTime;
+//       const progress = (currentTime - startTime) / duration;
+//       if (progress < 1) {
+//         setCount(Math.floor(end * progress));
+//         animationFrame = requestAnimationFrame(animate);
+//       } else {
+//         setCount(end);
+//       }
+//     };
+//     animationFrame = requestAnimationFrame(animate);
+//     return () => {
+//       if (animationFrame) {
+//         cancelAnimationFrame(animationFrame);
+//       }
+//     };
+//   }, [end, duration]);
+
+//   const formatted = count >= 1000 ? `${(count / 1000).toFixed(1)}K` : count.toLocaleString();
+//   return <span>{formatted}{suffix}</span>;
+// };
+
+// const StatCard = ({ title, value, icon: Icon, color, percentage, subtitle, actionLabel, onClick }) => {
+//   return (
+//     <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 border border-gray-100 group cursor-pointer" onClick={onClick}>
+//       <div className="flex items-start justify-between mb-4">
+//         <div className={`w-14 h-14 ${color} rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform`}>
+//           <Icon className="w-7 h-7 text-white" />
+//         </div>
+//         {percentage && (
+//           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">
+//             +{percentage}%
+//           </span>
+//         )}
+//       </div>
+//       <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
+//       <h3 className="text-3xl font-bold text-gray-800 mb-1">
+//         <CountUp end={value} />
+//       </h3>
+//       {subtitle && <p className="text-xs text-gray-400 mb-3">{subtitle}</p>}
+//       {actionLabel && (
+//         <div className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-2 flex items-center gap-1 group-hover:translate-x-1 transition-all duration-200">
+//           {actionLabel} <ArrowRight className="w-4 h-4" />
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
+
+// const UserTypeCard = ({ type, count, icon: Icon, color }) => {
+//   return (
+//     <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 border border-gray-100">
+//       <div className="flex items-center gap-4">
+//         <div className={`w-12 h-12 ${color} rounded-lg flex items-center justify-center`}>
+//           <Icon className="w-6 h-6 text-white" />
+//         </div>
+//         <div className="flex-1">
+//           <p className="text-gray-500 text-sm font-medium mb-0.5">{type}</p>
+//           <h4 className="text-2xl font-bold text-gray-800">
+//             <CountUp end={count} />
+//           </h4>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// const RecentActivityItem = ({ action, user, time, color }) => {
+//   return (
+//     <div className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+//       <div className={`w-2 h-2 ${color} rounded-full mt-2`}></div>
+//       <div className="flex-1">
+//         <p className="text-sm text-gray-800">{action}</p>
+//         <p className="text-xs text-gray-500 mt-0.5">{user} • {time}</p>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default function AdminDashboard() {
+//   const navigate = useNavigate();
+//   const userType = Number(localStorage.getItem("user_type"));
+
+//   useEffect(() => {
+//     if (userType !== 1 && userType !== 2) {
+//       navigate("/login");
+//     }
+//   }, [userType, navigate]);
+
+//   // Stats data
+//   const stats = {
+//     totalUsers: 15420,
+//     todaySignups: 245,
+//     totalJobs: 3567,
+//     activeJobs: 892,
+//     totalReferrals: 8923
+//   };
+
+//   const recentActivities = [
+//     { action: 'New company registered', user: 'Microsoft Corp', time: '10 min ago', color: 'bg-emerald-500' },
+//     { action: 'Job posting published', user: 'Google LLC', time: '25 min ago', color: 'bg-blue-500' },
+//     { action: 'New user signup', user: 'Emily Davis', time: '1 hour ago', color: 'bg-purple-500' },
+//     { action: 'Job application submitted', user: 'Robert Chen', time: '2 hours ago', color: 'bg-amber-500' }
+//   ];
+
+//   return (
+//     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+//       {/* Header */}
+//       <div className="mb-8">
+//         <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Overview</h1>
+//         <p className="text-gray-500">Monitor and manage your platform efficiently</p>
+//       </div>
+
+//       {/* Stats Cards */}
+//       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+//         <StatCard
+//           title="Total Users"
+//           value={stats.totalUsers}
+//           icon={Users}
+//           color="bg-blue-500"
+//           percentage={12}
+//           subtitle="All registered users"
+//           actionLabel="View all users"
+//           onClick={() => navigate('/userTypePage')}
+//         />
+
+//         <StatCard 
+//           title="Today Signups" 
+//           value={stats.todaySignups} 
+//           icon={UserPlus} 
+//           color="bg-emerald-500" 
+//           percentage={18} 
+//           subtitle="New registrations" 
+//           actionLabel="View signups" 
+//         />
+
+//         <StatCard 
+//           title="Total Job Postings" 
+//           value={stats.totalJobs} 
+//           icon={Briefcase} 
+//           color="bg-purple-500" 
+//           percentage={15} 
+//           subtitle="All jobs posted" 
+//           actionLabel="Manage jobs" 
+//         />
+
+//         <StatCard 
+//           title="Active Jobs" 
+//           value={stats.activeJobs} 
+//           icon={CheckCircle} 
+//           color="bg-amber-500" 
+//           percentage={7} 
+//           subtitle="Currently active" 
+//           actionLabel="View active" 
+//         />
+
+//         <StatCard 
+//           title="Total Referrals" 
+//           value={stats.totalReferrals} 
+//           icon={TrendingUp} 
+//           color="bg-rose-500" 
+//           percentage={22} 
+//           subtitle="Successful referrals" 
+//           actionLabel="View referrals" 
+//         />
+//       </div>
+
+//       {/* Users by Category */}
+//       <div className="mb-8">
+//         <div className="flex items-center justify-between mb-6">
+//           <h2 className="text-xl font-bold text-gray-800">Users by Category</h2>
+//           <button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-sm">
+//             Manage Categories
+//           </button>
+//         </div>
+//         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+//           {[
+//             { type: 'Students', count: 11690, icon: GraduationCap, color: 'bg-blue-500' },
+//             { type: 'Schools', count: 156, icon: School, color: 'bg-purple-500' },
+//             { type: 'Colleges', count: 1850, icon: Building2, color: 'bg-teal-500' },
+//             { type: 'Universities', count: 2890, icon: Building2, color: 'bg-amber-500' },
+//             { type: 'Companies', count: 766, icon: Briefcase, color: 'bg-rose-500' }
+//           ].map((userType, index) => (
+//             <UserTypeCard
+//               key={index}
+//               type={userType.type}
+//               count={userType.count}
+//               icon={userType.icon}
+//               color={userType.color}
+//             />
+//           ))}
+//         </div>
+//       </div>
+
+//       {/* Recent Activity */}
+//       <div className="grid grid-cols-1 gap-6">
+//         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+//           <div className="flex items-center justify-between mb-5">
+//             <h3 className="text-xl font-bold text-gray-800">Recent Activity</h3>
+//             <span className="text-sm text-blue-600 hover:text-blue-700 font-medium cursor-pointer">View all →</span>
+//           </div>
+//           <div className="space-y-4">
+//             {recentActivities.map((activity, index) => (
+//               <RecentActivityItem key={index} {...activity} />
+//             ))}
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, UserPlus, Briefcase, CheckCircle, TrendingUp, GraduationCap, School, Building2, LogOut, LayoutDashboard, Settings, Bell, Search, Calendar, ArrowRight, ArrowLeft } from 'lucide-react';
 import UserTypePage from "./userTypePage"
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const CountUp = ({ end, duration = 2000, suffix = '' }) => {
   const [count, setCount] = useState(0);
@@ -62,6 +285,10 @@ export default function AdminDashboard() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showUserTypePage, setShowUserTypePage] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState('');
 
   // Handle navigation functions
   const navigateToUsers = () => {
@@ -91,9 +318,76 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showUserTypePage, handleBackToDashboard]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserCount = async () => {
+      try {
+        const response = await fetch(`${API_URL}/admin/users`, {
+          credentials: 'include',
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.message || 'Failed to load users');
+        }
+        if (isMounted) {
+          const count = Array.isArray(data?.users) ? data.users.length : 0;
+          setTotalUsers(count);
+        }
+      } catch (error) {
+        if (isMounted) setTotalUsers(0);
+      }
+    };
+
+    loadUserCount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const loadJobs = useCallback(async (signal) => {
+    setJobsLoading(true);
+    setJobsError('');
+    try {
+      const response = await fetch(`${API_URL}/admin/jobs`, {
+        credentials: 'include',
+        signal,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to load jobs');
+      }
+      if (!signal?.aborted) {
+        setJobs(Array.isArray(data?.jobs) ? data.jobs : []);
+      }
+    } catch (error) {
+      if (!signal?.aborted) {
+        setJobs([]);
+        setJobsError(error?.message || 'Failed to load jobs');
+      }
+    } finally {
+      if (!signal?.aborted) setJobsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeMenu === 'jobs') {
+      const controller = new AbortController();
+      loadJobs(controller.signal);
+      return () => controller.abort();
+    }
+    return undefined;
+  }, [activeMenu, loadJobs]);
+
+  const handleNavigate = useCallback((menu) => {
+    setActiveMenu(menu);
+    setShowUserTypePage(false);
+  }, []);
+
   // Show UserTypePage
   if (showUserTypePage) {
-    return <UserTypePage onBack={handleBackToDashboard} />;
+    return <UserTypePage onBack={handleBackToDashboard} onNavigate={handleNavigate} />;
   }
 
   // ... (stats, recentActivities, handleLogout remain exactly the same)
@@ -115,9 +409,8 @@ export default function AdminDashboard() {
           <nav className="space-y-2">
             <button
               onClick={() => setActiveMenu('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                activeMenu === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${activeMenu === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+                }`}
             >
               <LayoutDashboard className="w-5 h-5" />
               {sidebarOpen && <span className="font-medium">Dashboard</span>}
@@ -126,9 +419,8 @@ export default function AdminDashboard() {
             {/* USERS BUTTON - Navigate to UserTypePage */}
             <button
               onClick={navigateToUsers}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                activeMenu === 'users' ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-200' : 'text-gray-600 hover:bg-gray-50'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${activeMenu === 'users' ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-200' : 'text-gray-600 hover:bg-gray-50'
+                }`}
             >
               <Users className="w-5 h-5" />
               {sidebarOpen && <span className="font-medium">Users</span>}
@@ -139,7 +431,7 @@ export default function AdminDashboard() {
               <Briefcase className="w-5 h-5" />
               {sidebarOpen && <span className="font-medium">Job Postings</span>}
             </button>
-            
+
             <button onClick={() => setActiveMenu('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${activeMenu === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}>
               <Settings className="w-5 h-5" />
               {sidebarOpen && <span className="font-medium">Settings</span>}
@@ -189,79 +481,128 @@ export default function AdminDashboard() {
         </div>
 
         <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Overview</h1>
-            <p className="text-gray-500">Monitor and manage your platform efficiently</p>
-          </div>
+          {activeMenu === 'jobs' ? (
+            <>
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Job Postings</h1>
+                <p className="text-gray-500">All jobs created by companies and employees.</p>
+              </div>
 
-          {/* TOTAL USERS CARD - Click to navigate to UserTypePage */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <StatCard
-              title="Total Users"
-              value={15420}
-              icon={Users}
-              color="bg-blue-500"
-              percentage={12}
-              subtitle="All registered users"
-              actionLabel="View all users"
-              onClick={goToUsersFromTotalUsers}  // ← NAVIGATES TO USERTYPEPAGE
-            />
-            
-            {/* Other stat cards unchanged */}
-            <StatCard title="Today Signups" value={245} icon={UserPlus} color="bg-emerald-500" percentage={18} subtitle="New registrations" actionLabel="View signups" />
-            <StatCard title="Total Job Postings" value={3567} icon={Briefcase} color="bg-purple-500" percentage={15} subtitle="All jobs posted" actionLabel="Manage jobs" />
-            <StatCard title="Active Jobs" value={892} icon={CheckCircle} color="bg-amber-500" percentage={7} subtitle="Currently active" actionLabel="View active" />
-            <StatCard title="Total Referrals" value={8923} icon={TrendingUp} color="bg-rose-500" percentage={22} subtitle="Successful referrals" actionLabel="View referrals" />
-          </div>
+              <div className="max-w-5xl mx-auto space-y-4">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-lg font-bold text-gray-800">All Job Posts ({jobs.length})</h3>
+                  </div>
+                  <div className="px-6 py-4 space-y-4">
+                    {jobsLoading && <p className="text-gray-500">Loading jobs...</p>}
 
-          {/* Rest of dashboard unchanged */}
-          {/* ... User Types, Recent Activity sections remain exactly the same ... */}
-          
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-800">Users by Category</h2>
-              <button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-sm">
-                Manage Categories
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              {[
-                { type: 'Students', count: 11690, icon: GraduationCap, color: 'bg-blue-500' },
-                { type: 'Schools', count: 156, icon: School, color: 'bg-purple-500' },
-                { type: 'Colleges', count: 1850, icon: Building2, color: 'bg-teal-500' },
-                { type: 'Universities', count: 2890, icon: Building2, color: 'bg-amber-500' },
-                { type: 'Companies', count: 766, icon: Briefcase, color: 'bg-rose-500' }
-              ].map((userType, index) => (
-                <UserTypeCard
-                  key={index}
-                  type={userType.type}
-                  count={userType.count}
-                  icon={userType.icon}
-                  color={userType.color}
+                    {!jobsLoading && jobs.length === 0 && !jobsError && (
+                      <p className="text-gray-500">No job posts created yet.</p>
+                    )}
+
+                    {jobsError && (
+                      <p className="text-red-600">{jobsError}</p>
+                    )}
+
+                    {jobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <div>
+                          <h3 className="font-semibold text-lg">{job.title}</h3>
+                          <p className="text-sm text-gray-500">
+                            Status: <span className="capitalize">{job.status}</span>
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Created: {new Date(job.created_at).toLocaleDateString()}
+                          </p>
+                          {job.company_name && (
+                            <p className="text-sm text-gray-500">Company: {job.company_name}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Overview</h1>
+                <p className="text-gray-500">Monitor and manage your platform efficiently</p>
+              </div>
+
+              {/* TOTAL USERS CARD - Click to navigate to UserTypePage */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <StatCard
+                  title="Total Users"
+                  value={totalUsers}
+                  icon={Users}
+                  color="bg-blue-500"
+                  subtitle="All registered users"
+                  actionLabel="View all users"
+                  onClick={goToUsersFromTotalUsers}  // ← NAVIGATES TO USERTYPEPAGE
                 />
-              ))}
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-xl font-bold text-gray-800">Recent Activity</h3>
-                <span className="text-sm text-blue-600 hover:text-blue-700 font-medium cursor-pointer">View all →</span>
+                {/* Other stat cards unchanged */}
+                <StatCard title="Today Signups" value={245} icon={UserPlus} color="bg-emerald-500" percentage={18} subtitle="New registrations" actionLabel="View signups" />
+                <StatCard title="Total Job Postings" value={3567} icon={Briefcase} color="bg-purple-500" percentage={15} subtitle="All jobs posted" actionLabel="Manage jobs" />
+                <StatCard title="Active Jobs" value={892} icon={CheckCircle} color="bg-amber-500" percentage={7} subtitle="Currently active" actionLabel="View active" />
+                <StatCard title="Total Referrals" value={8923} icon={TrendingUp} color="bg-rose-500" percentage={22} subtitle="Successful referrals" actionLabel="View referrals" />
               </div>
-              <div className="space-y-4">
-                {[
-                  { action: 'New company registered', user: 'Microsoft Corp', time: '10 min ago', color: 'bg-emerald-500' },
-                  { action: 'Job posting published', user: 'Google LLC', time: '25 min ago', color: 'bg-blue-500' },
-                  { action: 'New user signup', user: 'Emily Davis', time: '1 hour ago', color: 'bg-purple-500' },
-                  { action: 'Job application submitted', user: 'Robert Chen', time: '2 hours ago', color: 'bg-amber-500' }
-                ].map((activity, index) => (
-                  <RecentActivityItem key={index} {...activity} />
-                ))}
+
+              {/* Rest of dashboard unchanged */}
+              {/* ... User Types, Recent Activity sections remain exactly the same ... */}
+
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-800">Users by Category</h2>
+                  <button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-sm">
+                    Manage Categories
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                  {[
+                    { type: 'Students', count: 11690, icon: GraduationCap, color: 'bg-blue-500' },
+                    { type: 'Schools', count: 156, icon: School, color: 'bg-purple-500' },
+                    { type: 'Colleges', count: 1850, icon: Building2, color: 'bg-teal-500' },
+                    { type: 'Universities', count: 2890, icon: Building2, color: 'bg-amber-500' },
+                    { type: 'Companies', count: 766, icon: Briefcase, color: 'bg-rose-500' }
+                  ].map((userType, index) => (
+                    <UserTypeCard
+                      key={index}
+                      type={userType.type}
+                      count={userType.count}
+                      icon={userType.icon}
+                      color={userType.color}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-xl font-bold text-gray-800">Recent Activity</h3>
+                    <span className="text-sm text-blue-600 hover:text-blue-700 font-medium cursor-pointer">View all →</span>
+                  </div>
+                  <div className="space-y-4">
+                    {[
+                      { action: 'New company registered', user: 'Microsoft Corp', time: '10 min ago', color: 'bg-emerald-500' },
+                      { action: 'Job posting published', user: 'Google LLC', time: '25 min ago', color: 'bg-blue-500' },
+                      { action: 'New user signup', user: 'Emily Davis', time: '1 hour ago', color: 'bg-purple-500' },
+                      { action: 'Job application submitted', user: 'Robert Chen', time: '2 hours ago', color: 'bg-amber-500' }
+                    ].map((activity, index) => (
+                      <RecentActivityItem key={index} {...activity} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

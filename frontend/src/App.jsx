@@ -1,58 +1,3 @@
-// import React from "react";
-// import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-// import Register from "./components/Register";
-// import Login from "./components/Login";
-// import VerifyEmail from "./components/VerifyEmail";
-// import ForgotPassword from "./components/ForgotPassword";
-// import ResetPassword from "./components/ResetPassword";
-// import Dashboard from "./components/Dashboard";
-
-// function PrivateRoute({ children }) {
-//   const token = localStorage.getItem("token");
-//   return token ? children : <Navigate to="/login" replace />;
-// }
-
-
-// function PublicRoute({ children }) {
-//   const token = localStorage.getItem("token");
-//   return token ? <Navigate to="/dashboard" replace /> : children;
-// }
-
-// function App() {
-//   return (
-//     <Router>
-//       <Routes>
-//         {/* Redirect root */}
-//         <Route path="/" element={<Navigate to="/register" replace />} />
-
-//         {/* Public routes */}
-//         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-//         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-//         <Route path="/verify-email/:token" element={<VerifyEmail />} />
-//         <Route path="/forgot-password" element={<ForgotPassword />} />
-//         <Route path="/reset-password/:token" element={<ResetPassword />} />
-
-//         {/* Protected route */}
-//         <Route
-//           path="/dashboard"
-//           element={
-//             <PrivateRoute>
-//               <Dashboard />
-//             </PrivateRoute>
-//           }
-//         />
-
-//         {/* Catch-all redirect */}
-//         <Route path="*" element={<Navigate to="/" replace />} />
-//       </Routes>
-//     </Router>
-//   );
-// }
-
-// export default App;
-
-
-
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
@@ -86,14 +31,25 @@ import CompanyJobDetail from "./components/company/CompanyJobDetail";
 import PublicJobPage from "./components/publicJobPage";
 /* Admin Pages */
 import AdminDashboard from "./components/admin/adminDashboard";
+import AdminLayout from "./components/admin/AdminLayout";
 import UserListPage from "./components/admin/userTypePage";
+
 import StudentAppliedJobs from "./components/student/StudentAppliedJobs";
 import AppliedJobDetails from "./components/student/AppliedJobDetails";
+import ApplicantDetail from "./components/company/ApplicantDetail";
 /* Skill Test Pages - CATEGORY-BASED */
 import SkillTestCategories from "./components/student/exam/SkillTestSimplified.jsx";
 import SkillTestInstructions from "./components/student/exam/SkillTestInstructions_ModuleBased";
 import SkillTest from "./components/student/exam/SkillTestModular";
 import SkillTestResult from "./components/student/exam/Skilltestresult";
+
+/* Admin - Exam Management */
+import ExamManagement from "./components/admin/ExamManagement/ExamManagement";
+import Category from "./components/admin/ExamManagement/Category";
+import Subcategory from "./components/admin/ExamManagement/Subcategory";
+
+import Exam from "./components/admin/ExamManagement/Exam";
+import Questions from "./components/admin/ExamManagement/Questions";
 /* ---------------- Route Guards ---------------- */
 
 function PrivateRoute({ children }) {
@@ -286,6 +242,14 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/company/posts/:postId/applicant/:applicationId"
+          element={
+            <PrivateRoute>
+              <ApplicantDetail />
+            </PrivateRoute>
+          }
+        />
 
         {/* Main page - Shows categories with expandable tests */}
         <Route
@@ -326,22 +290,94 @@ function App() {
             </PrivateRoute>
           }
         />
-
-        {/* Admin routes */}
+        {/* Admin Dashboard */}
         <Route
           path="/admin-dashboard"
           element={
             <PrivateRoute>
-              <AdminDashboard />
+              <AdminLayout>
+                <AdminDashboard />
+              </AdminLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* User Management */}
+        <Route
+          path="/userTypePage"
+          element={
+            <PrivateRoute>
+              <AdminLayout>
+                <UserListPage />
+              </AdminLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* ⭐ NEW: Exam Management Routes */}
+
+        {/* Main Exam Management Container (All 5 steps handled internally) */}
+        <Route
+          path="/admin/exam-management"
+          element={
+            <PrivateRoute>
+              <AdminLayout>
+                <ExamManagement />
+              </AdminLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* Optional: Individual step routes (if you want direct access) */}
+        <Route
+          path="/admin/exam-management/category"
+          element={
+            <PrivateRoute>
+              <AdminLayout>
+                <Category />
+              </AdminLayout>
             </PrivateRoute>
           }
         />
 
         <Route
-          path="/userTypePage"
+          path="/admin/exam-management/subcategory"
           element={
             <PrivateRoute>
-              <UserListPage />
+              <AdminLayout>
+                <Subcategory />
+              </AdminLayout>
+            </PrivateRoute>
+          }
+        />
+
+
+        <Route
+          path="/admin/exam-management/exam"
+          element={
+            <PrivateRoute>
+              <AdminLayout>
+                <Exam />
+              </AdminLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/exam-management/questions"
+          element={
+            <PrivateRoute>
+              <AdminLayout>
+                <Questions />
+              </AdminLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/jobs"
+          element={
+            <PrivateRoute>
+              <Dashboard />
             </PrivateRoute>
           }
         />
