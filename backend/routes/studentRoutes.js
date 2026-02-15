@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
 
 const studentController = require("../controllers/studentController");
+const { getStudentEventFeed } = require("../controllers/eventController");
 
 const {
    getProfile,
@@ -42,6 +43,7 @@ router.use(authMiddleware);
    WELCOME STATUS CHECK
 ============================= */
 router.get("/welcome/status", checkWelcomeStatus);
+router.post("/welcome/complete", completeWelcome);
 
 /* =============================
    PROFILE
@@ -84,6 +86,7 @@ router.delete("/certifications/:id", deleteCertification);
    STUDENT – COMPANIES & JOBS
 ============================= */
 router.get("/companies", getCompaniesWithJobs);
+router.get("/events", getStudentEventFeed);
 router.get(
    "/student/basic-info",
    getStudentBasicInfo

@@ -11,6 +11,10 @@ const API_URL = import.meta.env.VITE_API_URL;
 export default function UniversityWelcome() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [states, setStates] = useState([]);
+    const [cities, setCities] = useState([]);
+    const [statesLoading, setStatesLoading] = useState(false);
+    const [citiesLoading, setCitiesLoading] = useState(false);
     const [formData, setFormData] = useState({
         state: "",
         city: "",
@@ -32,6 +36,66 @@ export default function UniversityWelcome() {
             navigate("/welcome");
         }
     }, [navigate]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadStates = async () => {
+            setStatesLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/geo/states`);
+                const data = await response.json();
+                if (response.ok && Array.isArray(data.states)) {
+                    if (isMounted) setStates(data.states);
+                } else if (isMounted) {
+                    setStates(Object.keys(STATES_AND_CITIES));
+                }
+            } catch (error) {
+                if (isMounted) setStates(Object.keys(STATES_AND_CITIES));
+            } finally {
+                if (isMounted) setStatesLoading(false);
+            }
+        };
+
+        loadStates();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        const selectedState = formData.state;
+        if (!selectedState) {
+            setCities([]);
+            return;
+        }
+
+        let isMounted = true;
+
+        const loadCities = async () => {
+            setCitiesLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/geo/cities?state=${encodeURIComponent(selectedState)}&limit=200`);
+                const data = await response.json();
+                if (response.ok && Array.isArray(data.cities)) {
+                    if (isMounted) setCities(data.cities);
+                } else if (isMounted) {
+                    setCities(STATES_AND_CITIES[selectedState] || []);
+                }
+            } catch (error) {
+                if (isMounted) setCities(STATES_AND_CITIES[selectedState] || []);
+            } finally {
+                if (isMounted) setCitiesLoading(false);
+            }
+        };
+
+        loadCities();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [formData.state]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -93,10 +157,11 @@ export default function UniversityWelcome() {
                                 required
                                 value={formData.state}
                                 onChange={handleChange}
+                                disabled={statesLoading}
                                 className="w-full mt-1.5 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
                                 <option value="">Select state</option>
-                                {Object.keys(STATES_AND_CITIES).map((state) => (
+                                {states.map((state) => (
                                     <option key={state} value={state}>{state}</option>
                                 ))}
                             </select>
@@ -112,11 +177,11 @@ export default function UniversityWelcome() {
                                 required
                                 value={formData.city}
                                 onChange={handleChange}
-                                disabled={!formData.state}
+                                disabled={!formData.state || citiesLoading}
                                 className="w-full mt-1.5 border border-gray-300 rounded-lg p-2.5 disabled:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
                                 <option value="">Select city</option>
-                                {formData.state && STATES_AND_CITIES[formData.state]?.map((city) => (
+                                {formData.state && cities.map((city) => (
                                     <option key={city} value={city}>{city}</option>
                                 ))}
                             </select>

@@ -18,15 +18,28 @@ const SkillTestResult = () => {
 
   const percentageNum = parseFloat(percentage);
 
+  const formatDisplayName = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return raw
+      .split(/\s+/)
+      .map((word) => {
+        if (word.length <= 3 && word === word.toUpperCase()) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  };
+
+
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center py-8 px-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-8 px-4">
       <div className="max-w-3xl w-full">
 
         {/* Result Card */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {/* Header with Score */}
           <div className="bg-blue-600 p-6">
-            <h2 className="text-2xl font-bold text-white mb-1">{testTitle}</h2>
+            <h2 className="text-2xl font-bold text-white mb-1">{formatDisplayName(testTitle)}</h2>
             <p className="text-blue-100">Skill Test Results</p>
           </div>
 

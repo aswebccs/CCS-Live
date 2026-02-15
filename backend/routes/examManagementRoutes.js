@@ -1,0 +1,76 @@
+const express = require("express");
+const router = express.Router();
+const examManagementController = require("../controllers/examManagementController");
+const authMiddleware = require("../middleware/authMiddleware");
+const requireAdmin = require("../middleware/requireAdmin");
+
+const {
+    listCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    toggleCategory,
+    listSubcategories,
+    createSubcategory,
+    updateSubcategory,
+    deleteSubcategory,
+    toggleSubcategory,
+    listExams,
+    createExam,
+    updateExam,
+    deleteExam,
+    toggleExam,
+    listLevels,
+    listExamTypes,
+    listQuestionTypes,
+    toggleQuestionType,
+    listExamModules,
+    createExamModules,
+    listExamQuestions,
+    createExamQuestions,
+    updateExamQuestion,
+    getExamAttemptStatus,
+    submitExamAttempt,
+    listExamAttempts,
+} = examManagementController;
+
+// Categories
+router.get("/categories", listCategories);
+router.post("/categories", authMiddleware, requireAdmin, createCategory);
+router.put("/categories/:id", authMiddleware, requireAdmin, updateCategory);
+router.delete("/categories/:id", authMiddleware, requireAdmin, deleteCategory);
+router.patch("/categories/:id/toggle", authMiddleware, requireAdmin, toggleCategory);
+
+// Subcategories
+router.get("/subcategories", listSubcategories);
+router.post("/subcategories", authMiddleware, requireAdmin, createSubcategory);
+router.put("/subcategories/:id", authMiddleware, requireAdmin, updateSubcategory);
+router.delete("/subcategories/:id", authMiddleware, requireAdmin, deleteSubcategory);
+router.patch("/subcategories/:id/toggle", authMiddleware, requireAdmin, toggleSubcategory);
+
+// Exams
+router.get("/exams", listExams);
+router.post("/exams", authMiddleware, requireAdmin, createExam);
+router.put("/exams/:id", authMiddleware, requireAdmin, updateExam);
+router.delete("/exams/:id", authMiddleware, requireAdmin, deleteExam);
+router.patch("/exams/:id/toggle", authMiddleware, requireAdmin, toggleExam);
+
+// Levels + Exam Types
+router.get("/levels", listLevels);
+router.get("/exam-types", listExamTypes);
+router.get("/question-types", authMiddleware, requireAdmin, listQuestionTypes);
+router.patch("/question-types/:id/toggle", authMiddleware, requireAdmin, toggleQuestionType);
+
+// Exam Modules + Questions
+router.get("/exams/:examId/modules", listExamModules);
+router.post("/exams/:examId/modules", authMiddleware, requireAdmin, createExamModules);
+router.get("/exams/:examId/questions", listExamQuestions);
+router.post("/exams/:examId/questions", authMiddleware, requireAdmin, createExamQuestions);
+router.put("/exams/:examId/questions/:questionId", authMiddleware, requireAdmin, updateExamQuestion);
+
+// Student attempt routes
+router.get("/exams/:examId/attempt-status", authMiddleware, getExamAttemptStatus);
+router.post("/exams/:examId/attempts/submit", authMiddleware, submitExamAttempt);
+router.get("/attempts", authMiddleware, requireAdmin, listExamAttempts);
+
+module.exports = router;

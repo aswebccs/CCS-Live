@@ -2,7 +2,7 @@ const pool = require("../db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { sendVerificationEmail, sendResetPasswordEmail } = require("../utils/sendEmail");
+const { sendVerificationEmail, sendResetPasswordEmail, sendWelcomeStudentEmail } = require("../utils/sendEmail");
 
 
 exports.registerUser = async (req, res) => {
@@ -58,7 +58,7 @@ exports.verifyEmail = async (req, res) => {
         const { token } = req.params;
 
         const userRes = await pool.query(
-            `SELECT id, is_verified FROM users WHERE verification_token=$1`,
+            `SELECT id, name, email, user_type, is_verified FROM users WHERE verification_token=$1`,
             [token]
         );
 
@@ -85,6 +85,24 @@ exports.verifyEmail = async (req, res) => {
             success: true,
         });
 
+        const userTypeLabelMap = {
+            3: "Student / Professional",
+            4: "College",
+            5: "University",
+            6: "School",
+            7: "Company",
+        };
+
+        if (user.email) {
+            sendWelcomeStudentEmail(
+                user.email,
+                user.name,
+                userTypeLabelMap[user.user_type] || "User"
+            ).catch((emailErr) => {
+                console.error("WELCOME EMAIL AFTER VERIFY FAILED ->", emailErr.message);
+            });
+        }
+
     } catch (err) {
         console.error("VERIFY EMAIL ERROR 👉", err.message);
         res.status(500).json({ message: "Server error" });
@@ -107,10 +125,10 @@ exports.resendVerification = async (req, res) => {
         const verificationToken = crypto.randomBytes(32).toString("hex");
         await pool.query("UPDATE users SET verification_token=$1 WHERE id=$2", [verificationToken, user.id]);
 
-        // Send verification email
-        await sendVerificationEmail(email, verificationToken);
-
+        // Respond first for faster UI, then send email in background.
         res.json({ message: "Verification email resent successfully" });
+        sendVerificationEmail(email, verificationToken)
+            .catch(err => console.error("RESEND EMAIL SEND FAILED ->", err.message));
     } catch (err) {
         console.error("RESEND VERIFICATION ERROR 👉", err.message);
         res.status(500).json({ message: "Server error" });
@@ -168,13 +186,15 @@ exports.logoutUser = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
+        const normalizedEmail = String(email || "").toLowerCase().trim();
 
-        if (!email)
+        if (!normalizedEmail) {
             return res.status(400).json({ message: "Email is required" });
+        }
 
         const userRes = await pool.query(
-            "SELECT id FROM users WHERE email=$1",
-            [email.toLowerCase().trim()]
+            "SELECT id, email FROM users WHERE email=$1",
+            [normalizedEmail]
         );
 
         if (!userRes.rows.length) {
@@ -183,15 +203,8 @@ exports.forgotPassword = async (req, res) => {
             });
         }
 
-        // 1️⃣ Generate raw token (send via email)
         const rawToken = crypto.randomBytes(32).toString("hex");
-
-        // 2️⃣ Hash token (store in DB)
-        const hashedToken = crypto
-            .createHash("sha256")
-            .update(rawToken)
-            .digest("hex");
-
+        const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
         const expires = new Date(Date.now() + 15 * 60 * 1000);
 
         await pool.query(
@@ -199,17 +212,18 @@ exports.forgotPassword = async (req, res) => {
        SET reset_password_token=$1,
            reset_password_expires=$2
        WHERE email=$3`,
-            [hashedToken, expires, email.toLowerCase().trim()]
+            [hashedToken, expires, normalizedEmail]
         );
-
-        // 3️⃣ Send RAW token in email
-        await sendResetPasswordEmail(email, rawToken);
 
         res.json({
             message: "If the email exists, a reset link has been sent",
         });
+
+        // Respond first for faster UI, then send email in background.
+        sendResetPasswordEmail(userRes.rows[0].email, rawToken)
+            .catch(err => console.error("FORGOT PASSWORD EMAIL SEND FAILED ->", err.message));
     } catch (err) {
-        console.error("FORGOT PASSWORD ERROR 👉", err.message);
+        console.error("FORGOT PASSWORD ERROR ->", err.message);
         res.status(500).json({ message: "Server error" });
     }
 };

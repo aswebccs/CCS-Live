@@ -4,6 +4,7 @@ const pool = require("../db");
 const { imageUpload, resumeUpload } = require("../middleware/upload");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../utils/cloudinaryUpload");
 const uploadResumeToCloudinary = require("../utils/uploadResumeToCloudinary");
+const { sendWelcomeStudentEmail, sendJobApplicationEmail } = require("../utils/sendEmail");
 
 
 const ensureDir = async (dirPath) => {
@@ -105,13 +106,22 @@ exports.updateProfile = async (req, res) => {
 ============================= */
 exports.completeWelcome = async (req, res) => {
     try {
+        console.log("\nCOMPLETE WELCOME CALLED");
+        console.log("Request body:", req.body);
+        console.log("User ID:", req.userId);
+
         const userId = req.userId;
         const { state, city, address, zipcode, phone } = req.body;
 
+        console.log("Received fields:", { state, city, address, zipcode, phone });
+
         // Validate required fields
         if (!state || !city || !address || !zipcode || !phone) {
+            console.error("Validation failed - Missing required fields");
             return res.status(400).json({ message: "All fields are required" });
         }
+
+        console.log("All fields validated");
 
         const result = await pool.query(
             `INSERT INTO profiles (user_id, state, city, address, zipcode, phone, updated_at)
@@ -128,10 +138,29 @@ exports.completeWelcome = async (req, res) => {
             [userId, state, city, address, zipcode, phone]
         );
 
+        console.log("Profile saved to database");
+
+        const userResult = await pool.query(
+            "SELECT name, email FROM users WHERE id = $1",
+            [userId]
+        );
+        const user = userResult.rows[0];
+
+        if (user && user.email) {
+            console.log("Sending welcome email to:", user.email);
+            try {
+                await sendWelcomeStudentEmail(user.email, user.name);
+                console.log("Welcome email sent successfully to:", user.email);
+            } catch (emailErr) {
+                console.error("WELCOME EMAIL SEND FAILED:", emailErr.message);
+            }
+        }
+
         res.json({ message: "Welcome completed", profile: result.rows[0] });
     } catch (err) {
-        console.error("WELCOME COMPLETE ERROR:", err.message);
-        res.status(500).json({ message: "Server error" });
+        console.error("\nWELCOME COMPLETE ERROR:", err.message);
+        console.error("Error stack:", err.stack);
+        res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
@@ -557,7 +586,7 @@ exports.getCompaniesWithJobs = async (req, res) => {
             FROM companies c
             JOIN company_jobs cj 
                 ON cj.company_id = c.id
-                AND cj.status = 'published'
+                AND cj.status IN ('published', 'reopen')
 
             LEFT JOIN company_job_types cjt 
                 ON cjt.job_id = cj.id
@@ -766,7 +795,7 @@ exports.applyJob = [
 
             // ✅ CHECK JOB EXISTS
             const jobQuery =
-                "SELECT * FROM company_jobs WHERE id = $1 AND status = 'published'";
+                "SELECT cj.*, c.name as company_name FROM company_jobs cj JOIN companies c ON cj.company_id = c.id WHERE cj.id = $1 AND cj.status IN ('published', 'reopen')";
             const { rows: jobRows } = await pool.query(jobQuery, [jobId]);
 
             if (jobRows.length === 0) {
@@ -775,6 +804,8 @@ exports.applyJob = [
                     message: "Job not found",
                 });
             }
+
+            const jobDetails = jobRows[0];
 
             // ✅ CHECK DUPLICATE APPLICATION
             const checkQuery =
@@ -795,19 +826,12 @@ exports.applyJob = [
             // ⭐ THIS IS WHERE YOUR CODE GOES
             // ================================
             let resumeUrl = null;
-
             if (req.file) {
                 const resumeResult = await uploadResumeToCloudinary(
                     req.file.buffer,
                     req.file.originalname
                 );
-
                 resumeUrl = resumeResult.secure_url;
-            } else {
-                return res.status(400).json({
-                    success: false,
-                    message: "Resume is required",
-                });
             }
 
             // ✅ INSERT APPLICATION
@@ -822,9 +846,29 @@ exports.applyJob = [
                 studentId,
                 jobId,
                 resumeUrl,
-                jobTitle || null,
-                company || null,
+                jobTitle || jobDetails.title || null,
+                company || jobDetails.company_name || null,
             ]);
+
+            const studentResult = await pool.query(
+                "SELECT name, email FROM users WHERE id = $1",
+                [studentId]
+            );
+            const student = studentResult.rows[0];
+
+            if (student && student.email) {
+                const emailDetails = {
+                    jobTitle: jobTitle || jobDetails.title,
+                    companyName: company || jobDetails.company_name,
+                    jobLocation: jobDetails.location || "Not specified",
+                    applicationDate: new Date().toLocaleDateString(),
+                };
+
+                sendJobApplicationEmail(student.email, student.name, emailDetails)
+                    .catch((emailErr) => {
+                        console.error("JOB APPLICATION EMAIL SEND FAILED:", emailErr.message);
+                    });
+            }
 
             return res.status(201).json({
                 success: true,

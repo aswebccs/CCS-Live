@@ -1279,12 +1279,20 @@ export default function IndeedClonePost() {
     };
 
     const validatePay = () => {
-        if (!job.pay_show_by) {
-            return "Please select how you want to show pay";
+        const hasAnyPayInput =
+            !!job.pay_show_by ||
+            !!job.pay_rate ||
+            !!String(job.pay_min || "").trim() ||
+            !!String(job.pay_max || "").trim();
+
+        // Payment section is optional. If untouched, allow continue.
+        if (!hasAnyPayInput) {
+            return null;
         }
 
-        if (!job.pay_rate) {
-            return "Please select pay rate";
+        // If user starts filling payment, require base selectors for consistency.
+        if (!job.pay_show_by || !job.pay_rate) {
+            return "Select both 'Show pay by' and 'Rate', or leave payment section empty";
         }
 
         const min = Number(job.pay_min);
@@ -1399,7 +1407,7 @@ export default function IndeedClonePost() {
         return null;
     };
     const validateBeforePublish = () => {
-        if (!job.title || !job.description || !job.pay_rate) {
+        if (!job.title || !job.description) {
             return "Job post is incomplete";
         }
         return null;

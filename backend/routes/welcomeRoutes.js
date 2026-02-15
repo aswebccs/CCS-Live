@@ -1,7 +1,8 @@
-        const express = require("express");
+const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
 const pool = require("../db");
+const { sendWelcomeStudentEmail } = require("../utils/sendEmail");
 
 router.use(authMiddleware);
 
@@ -71,9 +72,13 @@ router.get("/status", async (req, res) => {
 ============================= */
 router.post("/", async (req, res) => {
     try {
+        console.log("\nWELCOME POST HANDLER CALLED");
+
         const userId = req.userId;
         const userType = req.userType;
         const { state, city, address, zipcode, phone, company_type, headquarters, founded_year } = req.body;
+
+        console.log("User Type:", userType, "User ID:", userId);
 
         // Validate required fields based on user type
         if (userType === 7) {
@@ -89,11 +94,12 @@ router.post("/", async (req, res) => {
         }
 
         // Get user name for organization records
-        const userRes = await pool.query("SELECT name FROM users WHERE id = $1", [userId]);
+        const userRes = await pool.query("SELECT name, email FROM users WHERE id = $1", [userId]);
         if (!userRes.rows.length) {
             return res.status(404).json({ message: "User not found" });
         }
         const userName = userRes.rows[0].name;
+        const userEmail = userRes.rows[0].email;
 
         let tableName, result;
 
@@ -115,6 +121,16 @@ router.post("/", async (req, res) => {
                      RETURNING *`,
                     [userId, state, city, address, zipcode, phone]
                 );
+
+                // Send welcome email to student without blocking welcome completion.
+                if (userEmail) {
+                    try {
+                        await sendWelcomeStudentEmail(userEmail, userName);
+                        console.log("Welcome email sent successfully to:", userEmail);
+                    } catch (emailErr) {
+                        console.error("WELCOME EMAIL SEND FAILED:", emailErr.message);
+                    }
+                }
                 break;
 
             case 4: // College
@@ -188,9 +204,11 @@ router.post("/", async (req, res) => {
                 return res.status(400).json({ message: "Invalid user type" });
         }
 
+        console.log("Welcome data saved successfully");
         res.json({ message: "Welcome completed successfully" });
     } catch (err) {
-        console.error("COMPLETE WELCOME ERROR:", err.message);
+        console.error("\nCOMPLETE WELCOME ERROR:", err.message);
+        console.error("Error stack:", err.stack);
         res.status(500).json({ message: "Server error" });
     }
 });

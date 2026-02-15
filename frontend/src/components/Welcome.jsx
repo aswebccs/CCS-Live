@@ -1,3 +1,373 @@
+// import { useState, useEffect } from "react";
+// import { useNavigate } from "react-router-dom";
+// import { Input } from "./ui/input";
+// import { Label } from "./ui/label";
+// import { Button } from "./ui/button";
+// import { toast } from "sonner";
+
+// const API_URL = import.meta.env.VITE_API_URL;
+
+// export default function Welcome() {
+//     const navigate = useNavigate();
+//     const [userType, setUserType] = useState(null);
+//     const [loading, setLoading] = useState(false);
+//     const [states, setStates] = useState([]);
+//     const [cities, setCities] = useState([]);
+//     const [statesLoading, setStatesLoading] = useState(false);
+//     const [citiesLoading, setCitiesLoading] = useState(false);
+//     const [formData, setFormData] = useState({
+//         state: "",
+//         city: "",
+//         address: "",
+//         zipcode: "",
+//         phone: "",
+//         company_type: "",
+//         headquarters: "",
+//         founded_year: ""
+//     });
+
+//     useEffect(() => {
+//         const token = localStorage.getItem("token");
+//         const type = localStorage.getItem("userType");
+
+//         if (!token) {
+//             navigate("/login");
+//             return;
+//         }
+
+//         const userType = parseInt(type);
+//         setUserType(userType);
+
+//         // Redirect school users to school welcome page
+//         if (userType === 6) {
+//             navigate("/welcome/school");
+//             return;
+//         }
+
+//         // Redirect university users to university welcome page
+//         if (userType === 5) {
+//             navigate("/welcome/university");
+//             return;
+//         }
+//     }, [navigate]);
+
+//     useEffect(() => {
+//         let isMounted = true;
+
+//         const loadStates = async () => {
+//             setStatesLoading(true);
+//             try {
+//                 const response = await fetch(`${API_URL}/geo/states`);
+//                 const data = await response.json();
+//                 if (response.ok && Array.isArray(data.states)) {
+//                     if (isMounted) setStates(data.states);
+//                 } else {
+//                     toast.error("Failed to load states");
+//                 }
+//             } catch (error) {
+//                 toast.error("Failed to load states");
+//             } finally {
+//                 if (isMounted) setStatesLoading(false);
+//             }
+//         };
+
+//         loadStates();
+
+//         return () => {
+//             isMounted = false;
+//         };
+//     }, []);
+
+//     useEffect(() => {
+//         const selectedState = formData.state;
+//         if (!selectedState) {
+//             setCities([]);
+//             return;
+//         }
+
+//         let isMounted = true;
+
+//         const loadCities = async () => {
+//             setCitiesLoading(true);
+//             try {
+//                 const response = await fetch(`${API_URL}/geo/cities?state=${encodeURIComponent(selectedState)}&limit=200`);
+//                 const data = await response.json();
+//                 if (response.ok && Array.isArray(data.cities)) {
+//                     if (isMounted) setCities(data.cities);
+//                 } else {
+//                     if (isMounted) setCities([]);
+//                     toast.error("Failed to load cities");
+//                 }
+//             } catch (error) {
+//                 if (isMounted) setCities([]);
+//                 toast.error("Failed to load cities");
+//             } finally {
+//                 if (isMounted) setCitiesLoading(false);
+//             }
+//         };
+
+//         loadCities();
+
+//         return () => {
+//             isMounted = false;
+//         };
+//     }, [formData.state]);
+
+//     const handleSubmit = async (e) => {
+//         e.preventDefault();
+//         setLoading(true);
+
+//         try {
+//             const token = localStorage.getItem("token");
+//             const response = await fetch(`${API_URL}/welcome`, {
+//                 method: "POST",
+//                 headers: {
+//                     "Content-Type": "application/json",
+//                     Authorization: `Bearer ${token}`
+//                 },
+//                 body: JSON.stringify(formData)
+//             });
+
+//             const data = await response.json();
+
+//             if (response.ok) {
+//                 toast.success("Profile completed successfully!");
+//                 navigate("/dashboard");
+//             } else {
+//                 toast.error(data.message || "Failed to save information");
+//             }
+//         } catch (error) {
+//             console.error("Welcome form error:", error);
+//             toast.error("An error occurred. Please try again.");
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     const handleChange = (e) => {
+//         const { name, value } = e.target;
+//         setFormData(prev => ({
+//             ...prev,
+//             [name]: value,
+//             ...(name === "state" && { city: "" }) // Reset city when state changes
+//         }));
+//     };
+
+//     return (
+//         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+//             <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl">
+//                 <div className="text-center mb-8">
+//                     <h1 className="text-4xl font-bold text-gray-800 mb-2">Welcome! 🎉</h1>
+//                     <p className="text-gray-600">Let's complete your profile to get started</p>
+//                 </div>
+
+//                 <form onSubmit={handleSubmit} className="space-y-6">
+//                     {/* Company-specific fields - Only show for company users */}
+//                     {userType === 7 && (
+//                         <>
+//                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+//                                 {/* Company Type */}
+//                                 <div>
+//                                     <Label htmlFor="company_type" className="text-sm font-medium text-gray-700">
+//                                         Company Type <span className="text-red-500">*</span>
+//                                     </Label>
+//                                     <select
+//                                         id="company_type"
+//                                         name="company_type"
+//                                         required
+//                                         value={formData.company_type}
+//                                         onChange={handleChange}
+//                                         className="w-full mt-1.5 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+//                                     >
+//                                         <option value="">Select company type</option>
+//                                         <option value="Private">Private</option>
+//                                         <option value="Public">Public</option>
+//                                         <option value="Startup">Startup</option>
+//                                         <option value="Non-Profit">Non-Profit</option>
+//                                         <option value="Government">Government</option>
+//                                         <option value="Partnership">Partnership</option>
+//                                     </select>
+//                                 </div>
+
+//                                 {/* Founded Year */}
+//                                 <div>
+//                                     <Label htmlFor="founded_year" className="text-sm font-medium text-gray-700">
+//                                         Founded Year <span className="text-red-500">*</span>
+//                                     </Label>
+//                                     <Input
+//                                         id="founded_year"
+//                                         name="founded_year"
+//                                         type="number"
+//                                         required
+//                                         value={formData.founded_year}
+//                                         onChange={handleChange}
+//                                         placeholder="e.g., 2020"
+//                                         className="mt-1.5"
+//                                         min="1800"
+//                                         max={new Date().getFullYear()}
+//                                     />
+//                                 </div>
+//                             </div>
+
+//                             {/* Headquarters */}
+//                             <div>
+//                                 <Label htmlFor="headquarters" className="text-sm font-medium text-gray-700">
+//                                     Headquarters <span className="text-red-500">*</span>
+//                                 </Label>
+//                                 <Input
+//                                     id="headquarters"
+//                                     name="headquarters"
+//                                     type="text"
+//                                     required
+//                                     value={formData.headquarters}
+//                                     onChange={handleChange}
+//                                     placeholder="e.g., Mumbai, India"
+//                                     className="mt-1.5"
+//                                 />
+//                             </div>
+//                         </>
+//                     )}
+
+//                     {/* Only show location fields for non-company users */}
+//                     {userType !== 7 && (
+//                         <>
+//                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+//                                 {/* State */}
+//                                 <div>
+//                                     <Label htmlFor="state" className="text-sm font-medium text-gray-700">
+//                                         State <span className="text-red-500">*</span>
+//                                     </Label>
+//                                     <select
+//                                         id="state"
+//                                         name="state"
+//                                         required
+//                                         value={formData.state}
+//                                         onChange={handleChange}
+//                                         disabled={statesLoading}
+//                                         className="w-full mt-1.5 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+//                                     >
+//                                         <option value="">Select state</option>
+//                                         {states.map((state) => (
+//                                             <option key={state} value={state}>{state}</option>
+//                                         ))}
+//                                     </select>
+//                                 </div>
+
+//                                 {/* City */}
+//                                 <div>
+//                                     <Label htmlFor="city" className="text-sm font-medium text-gray-700">
+//                                         City <span className="text-red-500">*</span>
+//                                     </Label>
+//                                     <select
+//                                         id="city"
+//                                         name="city"
+//                                         required
+//                                         value={formData.city}
+//                                         onChange={handleChange}
+//                                         disabled={!formData.state || citiesLoading}
+//                                         className="w-full mt-1.5 border border-gray-300 rounded-lg p-2.5 disabled:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+//                                     >
+//                                         <option value="">Select city</option>
+//                                         {formData.state && cities.map((city) => (
+//                                             <option key={city} value={city}>{city}</option>
+//                                         ))}
+//                                     </select>
+//                                 </div>
+//                             </div>
+
+//                             {/* Address */}
+//                             <div>
+//                                 <Label htmlFor="address" className="text-sm font-medium text-gray-700">
+//                                     Address <span className="text-red-500">*</span>
+//                                 </Label>
+//                                 <Input
+//                                     id="address"
+//                                     name="address"
+//                                     type="text"
+//                                     required
+//                                     value={formData.address}
+//                                     onChange={handleChange}
+//                                     placeholder="Enter your complete address"
+//                                     className="mt-1.5"
+//                                 />
+//                             </div>
+
+//                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+//                                 {/* Zipcode */}
+//                                 <div>
+//                                     <Label htmlFor="zipcode" className="text-sm font-medium text-gray-700">
+//                                         Zipcode <span className="text-red-500">*</span>
+//                                     </Label>
+//                                     <Input
+//                                         id="zipcode"
+//                                         name="zipcode"
+//                                         type="text"
+//                                         required
+//                                         value={formData.zipcode}
+//                                         onChange={handleChange}
+//                                         placeholder="e.g., 110001"
+//                                         className="mt-1.5"
+//                                         maxLength={6}
+//                                     />
+//                                 </div>
+
+//                                 {/* Phone */}
+//                                 <div>
+//                                     <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+//                                         Phone Number <span className="text-red-500">*</span>
+//                                     </Label>
+//                                     <Input
+//                                         id="phone"
+//                                         name="phone"
+//                                         type="tel"
+//                                         required
+//                                         value={formData.phone}
+//                                         onChange={handleChange}
+//                                         placeholder="e.g., +91 9876543210"
+//                                         className="mt-1.5"
+//                                     />
+//                                 </div>
+//                             </div>
+//                         </>
+//                     )}
+
+//                     {/* Phone field for company users */}
+//                     {userType === 7 && (
+//                         <div>
+//                             <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+//                                 Phone Number <span className="text-red-500">*</span>
+//                             </Label>
+//                             <Input
+//                                 id="phone"
+//                                 name="phone"
+//                                 type="tel"
+//                                 required
+//                                 value={formData.phone}
+//                                 onChange={handleChange}
+//                                 placeholder="e.g., +91 9876543210"
+//                                 className="mt-1.5"
+//                             />
+//                         </div>
+//                     )}
+
+//                     <Button
+//                         type="submit"
+//                         disabled={loading}
+//                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+//                     >
+//                         {loading ? "Saving..." : "Continue"}
+//                     </Button>
+//                 </form>
+
+//                 <p className="text-center text-sm text-gray-500 mt-6">
+//                     All fields are required to access your dashboard
+//                 </p>
+//             </div>
+//         </div>
+//     );
+// }
+
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "./ui/input";
@@ -12,6 +382,10 @@ export default function Welcome() {
     const navigate = useNavigate();
     const [userType, setUserType] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [states, setStates] = useState([]);
+    const [cities, setCities] = useState([]);
+    const [statesLoading, setStatesLoading] = useState(false);
+    const [citiesLoading, setCitiesLoading] = useState(false);
     const [formData, setFormData] = useState({
         state: "",
         city: "",
@@ -26,12 +400,12 @@ export default function Welcome() {
     useEffect(() => {
         const token = localStorage.getItem("token");
         const type = localStorage.getItem("userType");
-        
+
         if (!token) {
             navigate("/login");
             return;
         }
-        
+
         const userType = parseInt(type);
         setUserType(userType);
 
@@ -47,6 +421,68 @@ export default function Welcome() {
             return;
         }
     }, [navigate]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadStates = async () => {
+            setStatesLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/geo/states`);
+                const data = await response.json();
+                if (response.ok && Array.isArray(data.states)) {
+                    if (isMounted) setStates(data.states);
+                } else if (isMounted) {
+                    setStates(Object.keys(STATES_AND_CITIES));
+                }
+            } catch (error) {
+                if (isMounted) setStates(Object.keys(STATES_AND_CITIES));
+            } finally {
+                if (isMounted) setStatesLoading(false);
+            }
+        };
+
+        loadStates();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        const selectedState = formData.state;
+        if (!selectedState) {
+            setCities([]);
+            return;
+        }
+
+        let isMounted = true;
+
+        const loadCities = async () => {
+            setCitiesLoading(true);
+            try {
+                const response = await fetch(
+                    `${API_URL}/geo/cities?state=${encodeURIComponent(selectedState)}&limit=200`
+                );
+                const data = await response.json();
+                if (response.ok && Array.isArray(data.cities)) {
+                    if (isMounted) setCities(data.cities);
+                } else if (isMounted) {
+                    setCities(STATES_AND_CITIES[selectedState] || []);
+                }
+            } catch (error) {
+                if (isMounted) setCities(STATES_AND_CITIES[selectedState] || []);
+            } finally {
+                if (isMounted) setCitiesLoading(false);
+            }
+        };
+
+        loadCities();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [formData.state]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -178,10 +614,11 @@ export default function Welcome() {
                                         required
                                         value={formData.state}
                                         onChange={handleChange}
+                                        disabled={statesLoading}
                                         className="w-full mt-1.5 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="">Select state</option>
-                                        {Object.keys(STATES_AND_CITIES).map((state) => (
+                                        {states.map((state) => (
                                             <option key={state} value={state}>{state}</option>
                                         ))}
                                     </select>
@@ -198,11 +635,11 @@ export default function Welcome() {
                                         required
                                         value={formData.city}
                                         onChange={handleChange}
-                                        disabled={!formData.state}
+                                        disabled={!formData.state || citiesLoading}
                                         className="w-full mt-1.5 border border-gray-300 rounded-lg p-2.5 disabled:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="">Select city</option>
-                                        {formData.state && STATES_AND_CITIES[formData.state]?.map((city) => (
+                                        {formData.state && cities.map((city) => (
                                             <option key={city} value={city}>{city}</option>
                                         ))}
                                     </select>
