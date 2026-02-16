@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
-import { ArrowLeft, Calendar, MapPin, Search, Clock, Link2, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Search, Clock, ChevronLeft, ChevronRight, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-export default function StudentApplyEvent() {
+export default function StudentApplyEvent({ publicView = false }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,9 +15,9 @@ export default function StudentApplyEvent() {
   const [datePostedFilter, setDatePostedFilter] = useState("all");
   const [applyingId, setApplyingId] = useState(null);
   const [appliedEventIds, setAppliedEventIds] = useState([]);
-  const [feedMode, setFeedMode] = useState("all");
   const [page, setPage] = useState(0);
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const [activeDescription, setActiveDescription] = useState(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -29,19 +29,23 @@ export default function StudentApplyEvent() {
         if (datePostedFilter !== "all") query.set("date_posted", datePostedFilter);
 
         const qs = query.toString();
-        const feedUrl = `${API_URL}/events/feed${qs ? `?${qs}` : ""}`;
-        const res = await fetch(feedUrl, {
+        const feedUrl = publicView
+          ? `${API_URL}/events/public/feed${qs ? `?${qs}` : ""}`
+          : `${API_URL}/events/feed${qs ? `?${qs}` : ""}`;
+        const res = await fetch(feedUrl, publicView ? {} : {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
           const nextEvents = Array.isArray(data.events) ? data.events : [];
           setEvents(nextEvents);
-          setAppliedEventIds(
-            nextEvents
-              .filter((event) => event.is_applied)
-              .map((event) => String(event.id))
-          );
+          if (!publicView) {
+            setAppliedEventIds(
+              nextEvents
+                .filter((event) => event.is_applied)
+                .map((event) => String(event.id))
+            );
+          }
         } else {
           setEvents([]);
           setAppliedEventIds([]);
@@ -55,21 +59,26 @@ export default function StudentApplyEvent() {
     };
 
     fetchEvents();
-  }, [eventTypeFilter, datePostedFilter]);
+  }, [eventTypeFilter, datePostedFilter, publicView]);
 
   const handleApply = async (eventId) => {
     if (!eventId || applyingId) return;
     const normalizedEventId = String(eventId);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please login to apply for this event.");
+      navigate("/login");
+      return;
+    }
     setApplyingId(normalizedEventId);
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/events/${eventId}/apply`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success(data.message || "You have applied for this event.");
+        toast.success(data.message || "Applied for this event successfully.");
         setAppliedEventIds((prev) => (
           prev.includes(normalizedEventId) ? prev : [...prev, normalizedEventId]
         ));
@@ -84,15 +93,10 @@ export default function StudentApplyEvent() {
   };
 
   const filteredEvents = useMemo(() => {
-    const baseEvents = feedMode === "applied"
-      ? events.filter((event) => (
-        event.is_applied || appliedEventIds.includes(String(event.id))
-      ))
-      : events;
     const term = search.trim().toLowerCase();
-    if (!term) return baseEvents;
+    if (!term) return events;
 
-    return baseEvents.filter((event) => {
+    return events.filter((event) => {
       const speakersText = Array.isArray(event.speakers)
         ? event.speakers.join(" ")
         : "";
@@ -104,7 +108,7 @@ export default function StudentApplyEvent() {
         speakersText.toLowerCase().includes(term)
       );
     });
-  }, [events, search, feedMode, appliedEventIds]);
+  }, [events, search]);
 
   useEffect(() => {
     setPage(0);
@@ -136,7 +140,7 @@ export default function StudentApplyEvent() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <style>{`
-        @import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap");
+        @import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap");
 
         :root {
           --panel: #ffffff;
@@ -179,9 +183,6 @@ export default function StudentApplyEvent() {
         .tag {
           background: var(--soft);
           border: 1px solid var(--border);
-        }
-        .font-display {
-          font-family: "Merriweather", Georgia, serif;
         }
         .font-body {
           font-family: "Source Sans 3", system-ui, sans-serif;
@@ -239,19 +240,19 @@ export default function StudentApplyEvent() {
       <div className="events-hero px-4 py-8">
         <div className="max-w-6xl mx-auto font-body">
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate(publicView ? "/" : "/dashboard")}
             className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to dashboard
+            {publicView ? "Back to home" : "Back to dashboard"}
           </button>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-8">
-              <p className="uppercase tracking-[0.2em] text-xs font-bold text-slate-500 mb-2">
+            <div className={publicView ? "lg:col-span-12" : "lg:col-span-8"}>
+              <p className="text-base font-body font-bold text-slate-900 mb-2">
                 Student Events
               </p>
-              <h1 className="text-3xl md:text-4xl font-display font-bold leading-tight text-purple-700">
+              <h1 className="text-3xl md:text-4xl font-body font-bold leading-tight text-slate-900">
                 Discover events that build your edge.
               </h1>
               <div className="mt-5 relative">
@@ -268,24 +269,34 @@ export default function StudentApplyEvent() {
                 <button
                   type="button"
                   onClick={() => setEventTypeFilter((prev) => (prev === "online" ? "all" : "online"))}
-                  className={`rounded-full border px-4 py-2 ${eventTypeFilter === "online" ? "border-slate-800 text-slate-900 bg-slate-50" : "border-slate-500 text-slate-700 bg-white"}`}
+                  className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-base font-semibold transition-colors ${
+                    eventTypeFilter === "online"
+                      ? "border-[#2f5fb3] bg-[#2f5fb3] text-white"
+                      : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                  }`}
                 >
-                  Event type: Online
+                  {eventTypeFilter === "online" && <Check className="h-4 w-4" />}
+                  Online
                 </button>
                 <button
                   type="button"
                   onClick={() => setEventTypeFilter((prev) => (prev === "in_person" ? "all" : "in_person"))}
-                  className={`rounded-full border px-4 py-2 ${eventTypeFilter === "in_person" ? "border-slate-800 text-slate-900 bg-slate-50" : "border-slate-500 text-slate-700 bg-white"}`}
+                  className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-base font-semibold transition-colors ${
+                    eventTypeFilter === "in_person"
+                      ? "border-[#2f5fb3] bg-[#2f5fb3] text-white"
+                      : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                  }`}
                 >
-                  Event type: In person
+                  {eventTypeFilter === "in_person" && <Check className="h-4 w-4" />}
+                  In person
                 </button>
                 <div className="relative">
                   <select
-                    className="appearance-none rounded-full border border-slate-500 pl-4 pr-10 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 min-w-[140px]"
+                    className="appearance-none rounded-full border border-slate-300 bg-white pl-4 pr-10 py-2.5 text-base font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2f5fb3]/30 min-w-[170px]"
                     value={datePostedFilter}
                     onChange={(e) => setDatePostedFilter(e.target.value)}
                   >
-                    <option value="all">Any date</option>
+                    <option value="all">Date posted</option>
                     <option value="24h">Last 24 hours</option>
                     <option value="7d">Last 7 days</option>
                     <option value="30d">Last 30 days</option>
@@ -294,29 +305,24 @@ export default function StudentApplyEvent() {
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-4">
-              <div className="rounded-3xl border border-slate-400 bg-gradient-to-b from-white to-slate-50 p-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-slate-900">Your feed</h2>
-                  <span className="text-xs text-slate-500">
-                    {feedMode === "applied" ? "Applied only" : "All events"}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-600 mt-2">
-                  Track your applied events here.
-                </p>
-                <div className="mt-4 grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFeedMode((prev) => (prev === "applied" ? "all" : "applied"))}
-                    className={`rounded-xl border px-3 py-2 text-left transition-colors ${feedMode === "applied" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-500 bg-white text-slate-700 hover:bg-slate-100"}`}
-                  >
-                    <p className="text-[11px] uppercase tracking-[0.12em]">Applied</p>
-                    <p className="text-lg font-semibold">{appliedEventIds.length}</p>
-                  </button>
+            {!publicView && (
+              <div className="lg:col-span-4">
+                <div className="rounded-3xl border border-slate-400 bg-gradient-to-b from-white to-slate-50 p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-slate-900">Your feed</h2>
+                  </div>
+                  <p className="text-sm text-slate-600 mt-2">
+                    Track your applied events here.
+                  </p>
+                  <div className="mt-4 grid grid-cols-1 gap-2">
+                    <div className="rounded-xl border border-slate-500 bg-white px-3 py-2 text-left">
+                      <p className="text-[11px] uppercase tracking-[0.12em]">Applied</p>
+                      <p className="text-lg font-semibold">{appliedEventIds.length}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -392,7 +398,7 @@ export default function StudentApplyEvent() {
                     <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200" />
                   )}
                   <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-700">
+                    <span className="rounded-full bg-white/90 px-3 py-1 text-sm uppercase tracking-[0.2em] text-[#1B1B1D]">
                       {event.event_type === "online" ? "Online" : "In person"}
                     </span>
                   </div>
@@ -406,30 +412,49 @@ export default function StudentApplyEvent() {
                   </div>
                   </div>
 
-                  <div className="p-4 card-body min-h-[210px]">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="p-4 card-body min-h-[330px]">
+                  <div className="flex items-center gap-2 text-sm text-[#1B1B1D]">
                     <Calendar className="w-4 h-4" />
                     {formatDate(event.start_date)}
                     <span className="mx-1">•</span>
                     <Clock className="w-4 h-4" />
                     {event.start_time || "Time not set"}
                   </div>
-                  <h3 className="text-base font-semibold text-slate-900 mt-2 line-clamp-2 min-h-[44px]">
+                  <h3
+                    className="text-base font-semibold text-slate-900 mt-2 line-clamp-2 min-h-[52px] cursor-pointer hover:text-[#2f5fb3]"
+                    onClick={() => navigate(`/events/public/${event.id}`)}
+                  >
                     {event.event_name}
                   </h3>
-                  {!!event.description && (
-                    <p className="text-xs text-slate-600 mt-2 line-clamp-2 min-h-[32px]">
-                      {event.description}
+                  <div className="mt-2 h-[104px] overflow-hidden">
+                    <p className="text-sm text-[#1B1B1D] whitespace-pre-wrap break-words line-clamp-4">
+                      {event.description || "No description provided."}
                     </p>
-                  )}
-                  <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                    {!!event.description && event.description.length > 160 && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveDescription({ title: event.event_name, text: event.description })}
+                        className="mt-1 text-xs font-semibold text-[#2f5fb3] hover:underline"
+                      >
+                        Read full description
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-3 h-[44px] flex items-start gap-2 text-sm text-[#1B1B1D] overflow-hidden">
                     <MapPin className="w-4 h-4" />
-                    {event.event_type === "online"
-                      ? "Online"
-                      : event.location || "Location not set"}
+                    <span className="line-clamp-2">
+                      {event.event_type === "online"
+                        ? "Online"
+                        : event.location || "Location not set"}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-[24px] text-sm text-[#1B1B1D] overflow-hidden">
+                    <span className="line-clamp-1">
+                      Created by: {event.organizer_name || "Organizer"}
+                    </span>
                   </div>
                   <div className="mt-auto pt-4 flex items-center justify-between">
-                    <div className="text-xs text-slate-500">
+                    <div className="text-sm text-[#1B1B1D]">
                       {event.applications_count ?? (Array.isArray(event.speakers) ? event.speakers.length : 0)} applied
                     </div>
                     <Button
@@ -441,19 +466,6 @@ export default function StudentApplyEvent() {
                       {appliedEventIds.includes(String(event.id)) ? "Applied" : applyingId === String(event.id) ? "Applying..." : "Apply"}
                     </Button>
                   </div>
-                    <div className="h-6 mt-3">
-                      {event.event_type === "online" && event.event_link && (
-                        <a
-                          href={event.event_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 break-all"
-                        >
-                          <Link2 className="w-4 h-4" />
-                          Join link
-                        </a>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -470,6 +482,26 @@ export default function StudentApplyEvent() {
           )}
         </div>
       </div>
+
+      {activeDescription && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">{activeDescription.title || "Event description"}</h3>
+            <p className="mt-3 max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-sm text-slate-700">
+              {activeDescription.text}
+            </p>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveDescription(null)}
+                className="rounded-lg bg-[#111827] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b1220]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

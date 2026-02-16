@@ -9,12 +9,16 @@ const {
     deleteMyEvent,
     updateMyEventStatus,
     getStudentEventFeed,
+    getPublicEventFeed,
+    getPublicEventById,
     applyToEvent,
     getEventApplicationsForOrganizer,
 } = require("../controllers/eventController");
 
 const router = express.Router();
 
+router.get("/public/feed", getPublicEventFeed);
+router.get("/public/:eventId", getPublicEventById);
 router.use(authMiddleware);
 router.post("/", imageUpload.single("eventMedia"), createEvent);
 router.get("/my", getMyEvents);

@@ -51,6 +51,14 @@ const sendMail = async ({ to, subject, html, text }) => {
     return result;
 };
 
+const ensureAbsoluteUrl = (url) => {
+    if (!url || typeof url !== "string") return null;
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+};
+
 exports.sendVerificationEmail = async (to, token) => {
     const verifyUrl = `${FRONTEND_URL}/verify-email/${token}`;
     const subject = "Verify your email";
@@ -268,6 +276,71 @@ exports.sendJobLiveEmail = async (to, companyName, jobDetails) => {
         `Location: ${jobLocation}`,
         `Posted On: ${postedDate}`,
         `View: ${jobLink}`,
+    ].join("\n");
+
+    return sendMail({ to, subject, html, text });
+};
+
+exports.sendEventApplicationEmail = async (to, studentName, eventDetails) => {
+    const safeName = studentName || "Student";
+    const eventName = eventDetails?.eventName || "Event";
+    const organizerName = eventDetails?.organizerName || "Organizer";
+    const eventType = eventDetails?.eventType || "online";
+    const eventDate = eventDetails?.eventDate || "Not specified";
+    const eventTime = eventDetails?.eventTime || "Not specified";
+    const joinLink = ensureAbsoluteUrl(eventDetails?.joinLink);
+    const location = eventDetails?.location || "Not specified";
+    const dashboardLink = `${FRONTEND_URL}/dashboard`;
+    const subject = "Event application received";
+
+    const joinSection = eventType === "online" && joinLink
+        ? `<p style="margin: 16px 0 0 0;"><a href="${joinLink}" class="btn" style="color: #ffffff; text-decoration: none;">Join Event</a></p>
+           <p style="margin: 12px 0 0 0; font-size: 13px; color: #4b5563; word-break: break-all;">Join link: ${joinLink}</p>`
+        : `<p style="margin: 12px 0 0 0; color: #4b5563;">Location: ${location}</p>`;
+
+    const textJoinSection = eventType === "online" && joinLink
+        ? `Join link: ${joinLink}`
+        : `Location: ${location}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 28px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 28px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb; border-top: 0; }
+          .btn { display: inline-block; margin-top: 10px; padding: 12px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0;">You have applied successfully</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${safeName},</p>
+            <p>Your application for <strong>${eventName}</strong> has been received.</p>
+            <p>Organizer: ${organizerName}<br/>Date: ${eventDate}<br/>Time: ${eventTime}</p>
+            ${joinSection}
+            <p style="margin-top: 18px;"><a href="${dashboardLink}" class="btn" style="color: #ffffff; text-decoration: none;">Open Dashboard</a></p>
+            <p style="margin-top: 16px;">Best regards,<br/><strong>Team CCS</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = [
+        `Hi ${safeName},`,
+        `Your application for ${eventName} has been received.`,
+        `Organizer: ${organizerName}`,
+        `Date: ${eventDate}`,
+        `Time: ${eventTime}`,
+        textJoinSection,
+        `Dashboard: ${dashboardLink}`,
     ].join("\n");
 
     return sendMail({ to, subject, html, text });

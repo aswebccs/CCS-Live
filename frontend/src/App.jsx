@@ -39,6 +39,7 @@ import StudentAppliedJobs from "./components/student/StudentAppliedJobs";
 import AppliedJobDetails from "./components/student/AppliedJobDetails";
 import ApplicantDetail from "./components/company/ApplicantDetail";
 import StudentApplyEvent from "./components/student/StudentApplyEvent";
+import PublicEventPage from "./components/student/PublicEventPage";
 import EventManage from "./components/events/EventManage";
 import EventDetail from "./components/events/EventDetail";
 /* Skill Test Pages - CATEGORY-BASED */
@@ -139,6 +140,8 @@ function App() {
         <Route path="/college/:id" element={<CollegePublicProfile />} />
         <Route path="/student/:id" element={<StudentPublicProfile />} />
         <Route path="/school/check" element={<SchoolPublicProfile />} />
+        <Route path="/events/public" element={<StudentApplyEvent publicView />} />
+        <Route path="/events/public/:eventId" element={<PublicEventPage />} />
         {/* <Route path="/company/check" element={<CompanyPublicProfile />} /> */}
 
 

@@ -3,6 +3,7 @@ const {
     uploadToCloudinary,
     deleteFromCloudinary,
 } = require("../utils/cloudinaryUpload");
+const { sendEventApplicationEmail } = require("../utils/sendEmail");
 
 const ORGANIZER_CONFIG = {
     4: { type: "college", table: "colleges", idColumn: "id", nameColumn: "name" },
@@ -559,6 +560,135 @@ exports.getStudentEventFeed = async (req, res) => {
     }
 };
 
+exports.getPublicEventFeed = async (req, res) => {
+    try {
+        const eventType = req.query.event_type;
+        const datePosted = req.query.date_posted;
+
+        await pool.query(
+            `
+            UPDATE events
+            SET status = 'inactive', updated_at = NOW()
+            WHERE status = 'active'
+              AND COALESCE(end_date, start_date) < CURRENT_DATE
+            `
+        );
+
+        const whereConditions = [
+            "e.status = 'active'",
+            "COALESCE(e.end_date, e.start_date) >= CURRENT_DATE",
+        ];
+        const params = [];
+
+        if (eventType === "online" || eventType === "in_person") {
+            params.push(eventType);
+            whereConditions.push(`e.event_type = $${params.length}`);
+        }
+
+        if (datePosted === "24h") {
+            whereConditions.push("e.created_at >= NOW() - INTERVAL '24 hours'");
+        } else if (datePosted === "7d") {
+            whereConditions.push("e.created_at >= NOW() - INTERVAL '7 days'");
+        } else if (datePosted === "30d") {
+            whereConditions.push("e.created_at >= NOW() - INTERVAL '30 days'");
+        }
+
+        const result = await pool.query(
+            `
+            SELECT
+                e.id,
+                e.organizer_type,
+                e.organizer_id,
+                e.event_type,
+                e.event_name,
+                e.event_link,
+                e.location,
+                e.start_date,
+                e.start_time,
+                e.end_date,
+                e.end_time,
+                e.description,
+                e.speakers,
+                e.event_media_url,
+                e.status,
+                e.created_at,
+                COALESCE(companies.name, schools.name, colleges.name, universities.name) AS organizer_name,
+                (
+                    SELECT COUNT(*)
+                    FROM event_applications ea_count
+                    WHERE ea_count.event_id = e.id
+                )::INT AS applications_count
+            FROM events e
+            LEFT JOIN companies ON e.organizer_type = 'company' AND e.organizer_id = companies.id
+            LEFT JOIN schools ON e.organizer_type = 'school' AND e.organizer_id = schools.id
+            LEFT JOIN colleges ON e.organizer_type = 'college' AND e.organizer_id = colleges.id
+            LEFT JOIN universities ON e.organizer_type = 'university' AND e.organizer_id = universities.id
+            WHERE ${whereConditions.join(" AND ")}
+            ORDER BY e.start_date ASC, e.start_time ASC, e.created_at DESC
+            `,
+            params
+        );
+
+        return res.json({ events: result.rows });
+    } catch (err) {
+        console.error("GET PUBLIC EVENT FEED ERROR:", err.message);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+
+exports.getPublicEventById = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+
+        const result = await pool.query(
+            `
+            SELECT
+                e.id,
+                e.organizer_type,
+                e.organizer_id,
+                e.event_type,
+                e.event_name,
+                e.event_link,
+                e.location,
+                e.start_date,
+                e.start_time,
+                e.end_date,
+                e.end_time,
+                e.description,
+                e.speakers,
+                e.event_media_url,
+                e.status,
+                e.created_at,
+                COALESCE(companies.name, schools.name, colleges.name, universities.name) AS organizer_name,
+                (
+                    SELECT COUNT(*)
+                    FROM event_applications ea_count
+                    WHERE ea_count.event_id = e.id
+                )::INT AS applications_count
+            FROM events e
+            LEFT JOIN companies ON e.organizer_type = 'company' AND e.organizer_id = companies.id
+            LEFT JOIN schools ON e.organizer_type = 'school' AND e.organizer_id = schools.id
+            LEFT JOIN colleges ON e.organizer_type = 'college' AND e.organizer_id = colleges.id
+            LEFT JOIN universities ON e.organizer_type = 'university' AND e.organizer_id = universities.id
+            WHERE e.id = $1
+              AND e.status = 'active'
+              AND COALESCE(e.end_date, e.start_date) >= CURRENT_DATE
+            LIMIT 1
+            `,
+            [eventId]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ message: "Event not found" });
+        }
+
+        return res.json({ event: result.rows[0] });
+    } catch (err) {
+        console.error("GET PUBLIC EVENT BY ID ERROR:", err.message);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+
 exports.getEventApplicationsForOrganizer = async (req, res) => {
     try {
         const userId = req.userId;
@@ -618,9 +748,22 @@ exports.applyToEvent = async (req, res) => {
 
         const eventResult = await pool.query(
             `
-            SELECT id, status
-            FROM events
-            WHERE id = $1
+            SELECT
+                e.id,
+                e.status,
+                e.event_type,
+                e.event_name,
+                e.event_link,
+                e.location,
+                e.start_date,
+                e.start_time,
+                COALESCE(companies.name, schools.name, colleges.name, universities.name) AS organizer_name
+            FROM events e
+            LEFT JOIN companies ON e.organizer_type = 'company' AND e.organizer_id = companies.id
+            LEFT JOIN schools ON e.organizer_type = 'school' AND e.organizer_id = schools.id
+            LEFT JOIN colleges ON e.organizer_type = 'college' AND e.organizer_id = colleges.id
+            LEFT JOIN universities ON e.organizer_type = 'university' AND e.organizer_id = universities.id
+            WHERE e.id = $1
             `,
             [eventId]
         );
@@ -629,7 +772,8 @@ exports.applyToEvent = async (req, res) => {
             return res.status(404).json({ message: "Event not found" });
         }
 
-        if (eventResult.rows[0].status !== "active") {
+        const event = eventResult.rows[0];
+        if (event.status !== "active") {
             return res.status(400).json({ message: "Event is not open for applications" });
         }
 
@@ -647,7 +791,27 @@ exports.applyToEvent = async (req, res) => {
             return res.status(200).json({ message: "You have already applied for this event." });
         }
 
-        return res.status(201).json({ message: "You have applied for this event." });
+        const studentResult = await pool.query(
+            "SELECT name, email FROM users WHERE id = $1",
+            [userId]
+        );
+        const student = studentResult.rows[0];
+
+        if (student?.email) {
+            sendEventApplicationEmail(student.email, student.name, {
+                eventName: event.event_name,
+                organizerName: event.organizer_name,
+                eventType: event.event_type,
+                joinLink: event.event_link,
+                location: event.location,
+                eventDate: event.start_date ? new Date(event.start_date).toLocaleDateString() : "Not specified",
+                eventTime: event.start_time || "Not specified",
+            }).catch((emailErr) => {
+                console.error("EVENT APPLICATION EMAIL SEND FAILED:", emailErr.message);
+            });
+        }
+
+        return res.status(201).json({ message: "Applied for this event successfully." });
     } catch (err) {
         console.error("APPLY EVENT ERROR:", err.message);
         return res.status(500).json({ message: "Server error" });
