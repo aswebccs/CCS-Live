@@ -1,274 +1,7 @@
-// import React, { useState, useEffect } from 'react';
-// import { X } from 'lucide-react';
-
-// const Subcategory = ({ categoryId, categoryName, onNext, onBack }) => {
-//   const [subcategories, setSubcategories] = useState([]);
-//   const [selectedSubcategory, setSelectedSubcategory] = useState('');
-//   const [showModal, setShowModal] = useState(false);
-//   const [loading, setLoading] = useState(true);
-  
-//   const [newSubcategory, setNewSubcategory] = useState({
-//     categoryId: categoryId,
-//     name: '',
-//     type: 'Exam',
-//     shortDescription: '',
-//     description: '',
-//     isActive: true
-//   });
-
-//   useEffect(() => {
-//     loadSubcategories();
-//   }, [categoryId]);
-
-//   const loadSubcategories = async () => {
-//     try {
-//       setLoading(true);
-//       const response = await fetch(`/api/subcategories?categoryId=${categoryId}`);
-//       const data = await response.json();
-//       setSubcategories(data);
-//     } catch (error) {
-//       console.error('Error loading subcategories:', error);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleCreateSubcategory = async (e) => {
-//     e.preventDefault();
-    
-//     try {
-//       const response = await fetch('/api/subcategories', {
-//         method: 'POST',
-//         headers: getAuthHeaders(true),
-//         body: JSON.stringify(newSubcategory)
-//       });
-      
-//       const createdSubcategory = await response.json();
-//       setSubcategories([...subcategories, createdSubcategory]);
-//       setSelectedSubcategory(createdSubcategory.id);
-//       setShowModal(false);
-      
-//       setNewSubcategory({
-//         categoryId: categoryId,
-//         name: '',
-//         type: 'Exam',
-//         shortDescription: '',
-//         description: '',
-//         isActive: true
-//       });
-//     } catch (error) {
-//       console.error('Error creating subcategory:', error);
-//       alert('Failed to create subcategory');
-//     }
-//   };
-
-//   const handleNext = () => {
-//     if (!selectedSubcategory) {
-//       alert('Please select a subcategory');
-//       return;
-//     }
-    
-//     const subcategory = subcategories.find(s => s.id === selectedSubcategory);
-//     onNext({
-//       subcategoryId: subcategory.id,
-//       subcategoryName: subcategory.name
-//     });
-//   };
-
-//   if (loading) {
-//     return (
-//       <div className="flex items-center justify-center min-h-screen">
-//         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="min-h-screen bg-gray-50 p-8">
-//       <div className="max-w-4xl mx-auto">
-//         <div className="bg-white rounded-lg shadow p-6">
-//           <h2 className="text-2xl font-bold mb-2">Select Subcategory</h2>
-//           <p className="text-gray-500 mb-6">Category: {categoryName}</p>
-          
-//           <div className="mb-6">
-//             <label className="block text-sm font-medium text-gray-700 mb-2">
-//               Sub Category Name
-//             </label>
-//             <select
-//               value={selectedSubcategory}
-//               onChange={(e) => setSelectedSubcategory(e.target.value)}
-//               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-//             >
-//               <option value="">Enter Category Name</option>
-//               {subcategories.map(sub => (
-//                 <option key={sub.id} value={sub.id}>{sub.name}</option>
-//               ))}
-//             </select>
-//           </div>
-
-//           <button
-//             onClick={() => setShowModal(true)}
-//             className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium"
-//           >
-//             NEW SUB CATEGORY
-//           </button>
-
-//           <div className="mt-6 flex justify-between">
-//             <button
-//               onClick={onBack}
-//               className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-//             >
-//               Back
-//             </button>
-//             <button
-//               onClick={handleNext}
-//               disabled={!selectedSubcategory}
-//               className={`px-6 py-2 rounded-lg font-medium ${
-//                 selectedSubcategory
-//                   ? 'bg-blue-600 text-white hover:bg-blue-700'
-//                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-//               }`}
-//             >
-//               Next
-//             </button>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Modal */}
-//       {showModal && (
-//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-//           <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-//             <div className="flex items-center justify-between p-6 border-b">
-//               <h2 className="text-xl font-bold text-gray-800">New Sub Category</h2>
-//               <button
-//                 onClick={() => setShowModal(false)}
-//                 className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-blue-50 text-blue-600 transition-colors"
-//               >
-//                 <X className="w-6 h-6" />
-//               </button>
-//             </div>
-
-//             <form onSubmit={handleCreateSubcategory} className="p-6">
-//               <div className="mb-6">
-//                 <label className="block text-sm font-medium text-gray-900 mb-2">
-//                   Sub Category Name
-//                 </label>
-//                 <input
-//                   type="text"
-//                   required
-//                   value={newSubcategory.name}
-//                   onChange={(e) => setNewSubcategory({ ...newSubcategory, name: e.target.value })}
-//                   placeholder="Enter Category Name"
-//                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-//                 />
-//               </div>
-
-//               <div className="mb-6">
-//                 <label className="block text-sm font-medium text-gray-900 mb-2">
-//                   Category <span className="text-red-500">*</span>
-//                 </label>
-//                 <select
-//                   value={newSubcategory.categoryId}
-//                   disabled
-//                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-//                 >
-//                   <option value={categoryId}>{categoryName}</option>
-//                 </select>
-//               </div>
-
-//               <div className="mb-6">
-//                 <label className="block text-sm font-medium text-gray-900 mb-2">
-//                   Type <span className="text-red-500">*</span>
-//                 </label>
-//                 <select
-//                   value={newSubcategory.type}
-//                   onChange={(e) => setNewSubcategory({ ...newSubcategory, type: e.target.value })}
-//                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-//                 >
-//                   <option value="Exam">Exam</option>
-//                   <option value="Quiz">Quiz</option>
-//                 </select>
-//               </div>
-
-//               <div className="mb-6">
-//                 <label className="block text-sm font-medium text-gray-900 mb-2">
-//                   Short Description
-//                 </label>
-//                 <textarea
-//                   rows={3}
-//                   value={newSubcategory.shortDescription}
-//                   onChange={(e) => setNewSubcategory({ ...newSubcategory, shortDescription: e.target.value })}
-//                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-//                 />
-//               </div>
-
-//               <div className="mb-6">
-//                 <label className="block text-sm font-medium text-gray-900 mb-2">
-//                   Description
-//                 </label>
-//                 <div className="border border-gray-300 rounded-lg overflow-hidden">
-//                   <div className="flex items-center gap-1 p-2 bg-white border-b border-gray-300">
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded"><strong>B</strong></button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded"><em>I</em></button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded"><s>S</s></button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded"><u>U</u></button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded text-sm">x₂</button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded text-sm">x²</button>
-//                     <div className="w-px h-6 bg-gray-300 mx-1"></div>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded">≡</button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded">≣</button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded">⊞</button>
-//                     <button type="button" className="p-2 hover:bg-gray-100 rounded">🖼</button>
-//                   </div>
-//                   <textarea
-//                     rows={8}
-//                     value={newSubcategory.description}
-//                     onChange={(e) => setNewSubcategory({ ...newSubcategory, description: e.target.value })}
-//                     className="w-full px-4 py-3 focus:outline-none resize-none"
-//                   />
-//                 </div>
-//               </div>
-
-//               <div className="mb-6">
-//                 <div className="flex items-center justify-between">
-//                   <div>
-//                     <label className="block text-sm font-medium text-gray-900 mb-1">Active</label>
-//                     <p className="text-sm text-gray-500">Active (Shown Everywhere). In-active (Hidden Everywhere).</p>
-//                   </div>
-//                   <label className="relative inline-flex items-center cursor-pointer">
-//                     <input
-//                       type="checkbox"
-//                       checked={newSubcategory.isActive}
-//                       onChange={(e) => setNewSubcategory({ ...newSubcategory, isActive: e.target.checked })}
-//                       className="sr-only peer"
-//                     />
-//                     <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-//                   </label>
-//                 </div>
-//               </div>
-
-//               <button
-//                 type="submit"
-//                 className="px-6 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium"
-//               >
-//                 Create
-//               </button>
-//             </form>
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );
-// };
-
-// export default Subcategory;
-
-
-
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { API_ENDPOINTS } from '../../../config/api';
 
 const Subcategories = () => {
   const [subcategories, setSubcategories] = useState([]);
@@ -291,8 +24,16 @@ const Subcategories = () => {
   });
 
   const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState({ type: '', message: '' });
   const modalRef = useRef(null);
-  const shownAlertsRef = useRef(new Set());
+  const [confirmModal, setConfirmModal] = useState({ 
+    isOpen: false, 
+    title: '', 
+    message: '', 
+    subcategoryName: '',
+    subcategoryId: null,
+    isProcessing: false
+  });
   const getAuthHeaders = (includeJson = false) => {
     const token = localStorage.getItem('token');
     return {
@@ -419,9 +160,9 @@ const Subcategories = () => {
         setShowModal(false);
         setEditingSubcategory(null);
         loadSubcategories();
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || (editingSubcategory ? 'Subcategory updated' : 'Subcategory created'), 'success');
       } else {
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Save failed');
       }
     } catch (error) {
       showAlertOnce('Save failed');
@@ -430,21 +171,47 @@ const Subcategories = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this subcategory?')) return;
+  const handleDelete = (id, name) => {
+    if (!id) {
+      showAlertOnce('Invalid subcategory id. Please refresh and try again.');
+      return;
+    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Subcategory',
+      message: `Are you sure you want to delete the subcategory "${name}"? This will move it to the Recycle Bin where you can restore or permanently delete it.`,
+      subcategoryName: name,
+      subcategoryId: id,
+      isProcessing: false
+    });
+  };
 
+  const handleConfirmDelete = async () => {
+    const id = confirmModal.subcategoryId;
+    if (!id) {
+      showAlertOnce('Invalid subcategory id. Please refresh and try again.');
+      return;
+    }
     try {
-      const res = await fetch(`http://localhost:5000/api/exam-management/subcategories/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-      const result = await res.json();
-
+      setConfirmModal(prev => ({ ...prev, isProcessing: true }));
+      const res = await fetch(API_ENDPOINTS.SUBCATEGORY_DELETE(id), { 
+        method: 'DELETE', 
+        headers: getAuthHeaders() 
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.message || `HTTP ${res.status}`);
       if (result.success) {
+        setConfirmModal({ isOpen: false, title: '', message: '', subcategoryName: '', subcategoryId: null, isProcessing: false });
         loadSubcategories();
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Subcategory deleted and moved to trash', 'success');
       } else {
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Delete failed');
       }
     } catch (error) {
-      showAlertOnce('Delete failed');
+      console.error('Delete error:', error);
+      showAlertOnce(error.message || 'Failed to delete subcategory. Please try again.');
+    } finally {
+      setConfirmModal(prev => ({ ...prev, isProcessing: false }));
     }
   };
 
@@ -455,6 +222,9 @@ const Subcategories = () => {
 
       if (result.success) {
         loadSubcategories();
+        showAlertOnce(result.message || 'Status updated', 'success');
+      } else {
+        showAlertOnce(result.message || 'Toggle failed');
       }
     } catch (error) {
       showAlertOnce('Toggle failed');
@@ -462,31 +232,99 @@ const Subcategories = () => {
   };
 
   const handleRowAction = (sub, action) => {
+    const subId = sub.id ?? sub.subcategory_id ?? null;
     if (action === 'edit') {
-      setEditingSubcategory(sub);
+      setEditingSubcategory({ ...sub, id: subId });
       setShowModal(true);
       return;
     }
     if (action === 'toggle') {
-      handleToggle(sub.id);
+      handleToggle(subId);
       return;
     }
     if (action === 'delete') {
-      handleDelete(sub.id);
+      handleDelete(subId, sub.name);
     }
   };
 
-  const showAlertOnce = (message) => {
-    if (shownAlertsRef.current.has(message)) return;
-    shownAlertsRef.current.add(message);
-    alert(message);
-    setTimeout(() => shownAlertsRef.current.delete(message), 3000);
+  const showAlertOnce = (message, type = 'error') => {
+    setNotice({ message, type });
+    setTimeout(() => setNotice({ message: '', type: '' }), 3000);
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {notice.message && (
+        <div className="fixed top-6 right-6 z-[60] w-[340px] animate-slideIn">
+          <div
+            className={`flex items-start gap-3 bg-white rounded-xl shadow-lg border border-gray-200 px-5 py-4 transition-all duration-300 ${
+              notice.type === "success"
+                ? "border-l-4 border-l-green-500"
+                : "border-l-4 border-l-red-500"
+            }`}
+          >
+            {/* Icon */}
+            <div className={`text-xl ${
+              notice.type === "success" ? "text-green-500" : "text-red-500"
+            }`}>
+              {notice.type === "success" ? "✓" : "⚠"}
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+                {notice.message}
+            </p>
+          </div>
+        </div>
+
+        )}
+
+        {/* Confirmation Modal */}
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+              {/* Modal Header */}
+              <div className="p-6 bg-red-50 border-b border-red-100">
+                <h3 className="text-lg font-bold text-red-900">
+                  {confirmModal.title}
+                </h3>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    if (!confirmModal.isProcessing) {
+                      setConfirmModal({ isOpen: false, title: '', message: '', subcategoryName: '', subcategoryId: null, isProcessing: false });
+                    }
+                  }}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500 flex items-center gap-2"
+                >
+                  {confirmModal.isProcessing && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  )}
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">Sub Categories</h1>
           <button
@@ -552,7 +390,7 @@ const Subcategories = () => {
             <div className="p-8 text-center text-gray-500">No subcategories found</div>
           ) : (
             subcategories.map((sub) => (
-              <div key={sub.id} className="grid grid-cols-5 gap-4 items-center p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
+              <div key={sub.id ?? sub.subcategory_id ?? sub.code} className="grid grid-cols-5 gap-4 items-center p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
                 <div>
                   <span className="inline-flex items-center gap-1 bg-blue-500 text-white px-3 py-1.5 rounded text-sm font-medium">
                      {sub.code}
@@ -722,9 +560,40 @@ const Subcategories = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
 
 export default Subcategories;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

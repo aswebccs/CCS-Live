@@ -6,6 +6,9 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react';
+import { Header } from '../../customreuse/Header';
+
+const SKILL_TEST_LOCK_KEY = 'skill_test_lock';
 
 const SkillTestSimplified = () => {
   const navigate = useNavigate();
@@ -30,8 +33,22 @@ const SkillTestSimplified = () => {
       navigate('/login');
       return;
     }
+
+    const examLock = sessionStorage.getItem(SKILL_TEST_LOCK_KEY);
+    if (examLock) {
+      try {
+        const parsed = JSON.parse(examLock);
+        if (parsed?.status === 'in_progress' && parsed?.testId) {
+          navigate(`/student/skill-test/${parsed.testId}/take`, { replace: true });
+          return;
+        }
+      } catch (e) {
+        sessionStorage.removeItem(SKILL_TEST_LOCK_KEY);
+      }
+    }
+
     fetchInitialData();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     setSearchQuery('');
@@ -297,12 +314,15 @@ const SkillTestSimplified = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen from-slate-50 to-blue-50 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={() => window.location.reload()} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Retry</button>
+      <div className="min-h-screen from-slate-50 to-blue-50">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Error</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button onClick={() => window.location.reload()} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Retry</button>
+          </div>
         </div>
       </div>
     );
@@ -310,10 +330,13 @@ const SkillTestSimplified = () => {
 
   if (loading && categories.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-semibold">Loading skill tests...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-gray-600 font-semibold">Loading skill tests...</p>
+          </div>
         </div>
       </div>
     );
@@ -321,7 +344,8 @@ const SkillTestSimplified = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <Header />
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
         <div className="mb-8">
           {view !== 'categories' && (
             <button
@@ -333,13 +357,13 @@ const SkillTestSimplified = () => {
             </button>
           )}
 
-          <h1 className="text-4xl font-black text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 mb-2">
             {view === 'categories' && 'Choose Your Category'}
             {view === 'subcategories' && `${formatDisplayName(selectedCategory?.name)} Subcategories`}
             {view === 'exams' && `${formatDisplayName(selectedSubcategory?.name)} Exams`}
             {view === 'levels' && `${formatDisplayName(selectedExamGroup?.title)} Levels`}
           </h1>
-          <p className="text-gray-600 text-lg">
+          <p className="text-gray-600 text-sm sm:text-base lg:text-lg">
             {view === 'categories' && 'Select a category to begin your assessment'}
             {view === 'subcategories' && 'Choose a subcategory'}
             {view === 'exams' && 'Choose an exam'}

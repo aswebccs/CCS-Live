@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
+import { API_ENDPOINTS } from '../../../config/api';
 
 const Exams = ({ onNext }) => {
   const navigate = useNavigate();
@@ -38,7 +39,15 @@ const Exams = ({ onNext }) => {
   const [saving, setSaving] = useState(false);
   const editorRef = useRef(null);
   const modalRef = useRef(null);
-  const shownAlertsRef = useRef(new Set());
+  const [notice, setNotice] = useState({ type: '', message: '' });
+  const [confirmModal, setConfirmModal] = useState({ 
+    isOpen: false, 
+    title: '', 
+    message: '', 
+    examName: '',
+    examId: null,
+    isProcessing: false
+  });
 
   const getAuthHeaders = (includeJson = false) => {
     const token = localStorage.getItem('token');
@@ -216,13 +225,13 @@ const Exams = ({ onNext }) => {
         setShowModal(false);
         setEditingExam(null);
         loadExams();
-        showAlertOnce(result.message || (editingExam ? 'Exam updated' : 'Exam created'));
+        showAlertOnce(result.message || (editingExam ? 'Exam updated' : 'Exam created'), 'success');
         if (!editingExam && onNext && result.data) {
           const levelName = levels.find(l => String(l.id) === String(result.data.level_id))?.name || '';
           onNext({ examId: result.data.id, examTitle: result.data.title, levelName });
         }
       } else {
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Save failed');
       }
     } catch (error) {
       showAlertOnce('Save failed');
@@ -231,19 +240,47 @@ const Exams = ({ onNext }) => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this exam?')) return;
+  const handleDelete = (id, name) => {
+    if (!id) {
+      showAlertOnce('Invalid exam id. Please refresh and try again.');
+      return;
+    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Exam',
+      message: `Are you sure you want to delete the exam "${name}"? This will move it to the Recycle Bin where you can restore or permanently delete it.`,
+      examName: name,
+      examId: id,
+      isProcessing: false
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const id = confirmModal.examId;
+    if (!id) {
+      showAlertOnce('Invalid exam id. Please refresh and try again.');
+      return;
+    }
     try {
-    const res = await fetch(`http://localhost:5000/api/exam-management/exams/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-      const result = await res.json();
+      setConfirmModal(prev => ({ ...prev, isProcessing: true }));
+      const res = await fetch(API_ENDPOINTS.EXAM_DELETE(id), { 
+        method: 'DELETE', 
+        headers: getAuthHeaders() 
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.message || `HTTP ${res.status}`);
       if (result.success) {
+        setConfirmModal({ isOpen: false, title: '', message: '', examName: '', examId: null, isProcessing: false });
         loadExams();
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Exam deleted and moved to trash', 'success');
       } else {
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Delete failed');
       }
     } catch (error) {
-      showAlertOnce('Delete failed');
+      console.error('Delete error:', error);
+      showAlertOnce(error.message || 'Failed to delete exam. Please try again.');
+    } finally {
+      setConfirmModal(prev => ({ ...prev, isProcessing: false }));
     }
   };
 
@@ -251,20 +288,30 @@ const Exams = ({ onNext }) => {
     try {
     const res = await fetch(`http://localhost:5000/api/exam-management/exams/${id}/toggle`, { method: 'PATCH', headers: getAuthHeaders() });
       const result = await res.json();
-      if (result.success) loadExams();
+      if (result.success) {
+        loadExams();
+        showAlertOnce(result.message || 'Status updated', 'success');
+      } else {
+        showAlertOnce(result.message || 'Toggle failed');
+      }
     } catch (error) {
       showAlertOnce('Toggle failed');
     }
   };
 
   const handleGoToQuestions = (exam) => {
+    const examId = exam.id ?? exam.exam_id;
+    if (!examId) {
+      showAlertOnce('Invalid exam id. Please refresh and try again.');
+      return;
+    }
     const levelName = levels.find(l => String(l.id) === String(exam.level_id))?.name || '';
     if (onNext) {
-      onNext({ examId: exam.id, examTitle: exam.title, levelName });
+      onNext({ examId, examTitle: exam.title, levelName });
       return;
     }
     const params = new URLSearchParams({
-      examId: String(exam.id),
+      examId: String(examId),
       examTitle: exam.title || '',
       levelName: levelName || '',
     });
@@ -272,6 +319,7 @@ const Exams = ({ onNext }) => {
   };
 
   const handleRowAction = (exam, action) => {
+    const examId = exam.id ?? exam.exam_id ?? null;
     if (action === 'manage_questions') {
       handleGoToQuestions(exam);
       return;
@@ -281,16 +329,16 @@ const Exams = ({ onNext }) => {
       return;
     }
     if (action === 'edit') {
-      setEditingExam(exam);
+      setEditingExam({ ...exam, id: examId });
       setShowModal(true);
       return;
     }
     if (action === 'toggle') {
-      handleToggle(exam.id);
+      handleToggle(examId);
       return;
     }
     if (action === 'delete') {
-      handleDelete(exam.id);
+      handleDelete(examId, exam.title);
     }
   };
 
@@ -301,11 +349,9 @@ const Exams = ({ onNext }) => {
     setFormData((prev) => ({ ...prev, description: editorRef.current.innerHTML }));
   };
 
-  const showAlertOnce = (message) => {
-    if (shownAlertsRef.current.has(message)) return;
-    shownAlertsRef.current.add(message);
-    alert(message);
-    setTimeout(() => shownAlertsRef.current.delete(message), 3000);
+  const showAlertOnce = (message, type = 'error') => {
+    setNotice({ message, type });
+    setTimeout(() => setNotice({ message: '', type: '' }), 3000);
   };
 
   const getStatusBadgeClass = (isActive) => (
@@ -315,6 +361,75 @@ const Exams = ({ onNext }) => {
   return (
     <div className="min-h-screen bg-gray-100 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
+        {notice.message && (
+        <div className="fixed top-6 right-6 z-[60] w-[340px] animate-slideIn">
+          <div
+            className={`flex items-start gap-3 bg-white rounded-xl shadow-lg border border-gray-200 px-5 py-4 transition-all duration-300 ${
+              notice.type === "success"
+                ? "border-l-4 border-l-green-500"
+                : "border-l-4 border-l-red-500"
+            }`}
+          >
+            {/* Icon */}
+            <div className={`text-xl ${
+              notice.type === "success" ? "text-green-500" : "text-red-500"
+            }`}>
+              {notice.type === "success" ? "✓" : "⚠"}
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+                {notice.message}
+            </p>
+          </div>
+        </div>
+
+        )}
+
+        {/* Confirmation Modal */}
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+              {/* Modal Header */}
+              <div className="p-6 bg-red-50 border-b border-red-100">
+                <h3 className="text-lg font-bold text-red-900">
+                  {confirmModal.title}
+                </h3>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    if (!confirmModal.isProcessing) {
+                      setConfirmModal({ isOpen: false, title: '', message: '', examName: '', examId: null, isProcessing: false });
+                    }
+                  }}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500 flex items-center gap-2"
+                >
+                  {confirmModal.isProcessing && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  )}
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">Exams</h1>
           <button
@@ -375,7 +490,7 @@ const Exams = ({ onNext }) => {
             <div className="p-8 text-center text-gray-500">No exams found</div>
           ) : (
             exams.map((exam) => (
-              <div key={exam.id} className="grid grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1fr_240px] gap-4 items-center p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
+              <div key={exam.id ?? exam.exam_id ?? exam.code} className="grid grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1fr_240px] gap-4 items-center p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
                 <div>
                   <button
                     onClick={() => handleGoToQuestions(exam)}
@@ -496,21 +611,6 @@ const Exams = ({ onNext }) => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Exam Type <span className="text-red-500">*</span></label>
-                  <select
-                    required
-                    value={formData.exam_type}
-                    onChange={(e) => setFormData({ ...formData, exam_type: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Exam Type</option>
-                    {examTypes.map((type) => (
-                      <option key={type.id} value={type.name}>{type.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">Duration (minutes) <span className="text-red-500">*</span></label>
                   <input type="number" required min="1" value={formData.duration_minutes}
                     onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })}
@@ -556,9 +656,37 @@ const Exams = ({ onNext }) => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
 
 export default Exams;
+
+
+
+
+
+
+
+
+
+
+
 

@@ -93,6 +93,8 @@ export default function AdminDashboard() {
     universities: 0,
     companies: 0,
   });
+  const [generateCertLoading, setGenerateCertLoading] = useState(false);
+  const [generateCertMessage, setGenerateCertMessage] = useState('');
 
   // Handle navigation functions
   const navigateToUsers = () => {
@@ -368,6 +370,30 @@ export default function AdminDashboard() {
     setActiveMenu(menu);
     setShowUserTypePage(false);
   }, []);
+
+  const generateCertificatesForPastExams = async () => {
+    setGenerateCertLoading(true);
+    setGenerateCertMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/certificates/generate-for-past-exams`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to generate certificates');
+      }
+      setGenerateCertMessage(`✅ ${data.message} (${data.generated}/${data.total} certificates)`);
+    } catch (error) {
+      setGenerateCertMessage(`❌ ${error?.message || 'Error generating certificates'}`);
+    } finally {
+      setGenerateCertLoading(false);
+    }
+  };
 
   const filteredJobs = jobFilter === 'active'
     ? jobs.filter((job) => String(job.status).toLowerCase() === 'published')

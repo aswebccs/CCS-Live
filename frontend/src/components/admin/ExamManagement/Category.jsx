@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   X
 } from 'lucide-react';
+import { API_ENDPOINTS } from '../../../config/api';
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -23,8 +24,16 @@ const Categories = () => {
   });
   const [saving, setSaving] = useState(false);
   const editorRef = useRef(null);
-  const shownAlertsRef = useRef(new Set());
+  const [notice, setNotice] = useState({ type: '', message: '' });
   const modalRef = useRef(null);
+  const [confirmModal, setConfirmModal] = useState({ 
+    isOpen: false, 
+    title: '', 
+    message: '', 
+    categoryName: '',
+    categoryId: null,
+    isProcessing: false
+  });
 
   const getAuthHeaders = (includeJson = false) => {
     const token = localStorage.getItem('token');
@@ -90,15 +99,22 @@ const Categories = () => {
         ...(filterStatus && { status: filterStatus })
       });
 
-      const res = await fetch(`http://localhost:5000/api/exam-management/categories?${params}`);
+      const res = await fetch(`http://localhost:5000/api/exam-management/categories?${params}`, { 
+        headers: getAuthHeaders() 
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
       const result = await res.json();
 
       if (result.success) {
-        setCategories(result.data);
-        setTotalPages(result.pagination.totalPages);
+        setCategories(result.data || []);
+        setTotalPages(result.pagination?.totalPages || 1);
+      } else {
+        showAlertOnce(result.message || 'Failed to load categories');
       }
-    } catch {
-      showAlertOnce('Failed to load categories');
+    } catch (error) {
+      console.error('Load categories error:', error);
+      showAlertOnce('Failed to load categories. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -141,9 +157,9 @@ const Categories = () => {
         setShowModal(false);
         setEditingCategory(null);
         loadCategories();
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || (editingCategory ? 'Category updated' : 'Category created'), 'success');
       } else {
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Save failed');
       }
     } catch {
       showAlertOnce('Save failed');
@@ -152,28 +168,55 @@ const Categories = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
-    
+  const handleDelete = (id, name) => {
+    if (!id) {
+      showAlertOnce('Invalid category id. Please refresh and try again.');
+      return;
+    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Category',
+      message: `Are you sure you want to delete the category "${name}"? This will move it to the Recycle Bin where you can restore or permanently delete it.`,
+      categoryName: name,
+      categoryId: id,
+      isProcessing: false
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const id = confirmModal.categoryId;
+    if (!id) {
+      showAlertOnce('Invalid category id. Please refresh and try again.');
+      return;
+    }
     try {
-    const res = await fetch(`http://localhost:5000/api/exam-management/categories/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
+      setConfirmModal(prev => ({ ...prev, isProcessing: true }));
+      const res = await fetch(API_ENDPOINTS.CATEGORY_DELETE(id), { 
+        method: 'DELETE', 
+        headers: getAuthHeaders() 
       });
-      const result = await res.json();
-      
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.message || `HTTP ${res.status}`);
       if (result.success) {
+        setConfirmModal({ isOpen: false, title: '', message: '', categoryName: '', categoryId: null, isProcessing: false });
         loadCategories();
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Category deleted and moved to trash', 'success');
       } else {
-        showAlertOnce(result.message);
+        showAlertOnce(result.message || 'Delete failed');
       }
-    } catch {
-      showAlertOnce('Delete failed');
+    } catch (error) {
+      console.error('Delete error:', error);
+      showAlertOnce(error.message || 'Failed to delete category. Please try again.');
+    } finally {
+      setConfirmModal(prev => ({ ...prev, isProcessing: false }));
     }
   };
 
   const handleToggle = async (id) => {
+    if (!id) {
+      showAlertOnce('Invalid category id. Please refresh and try again.');
+      return;
+    }
     try {
     const res = await fetch(`http://localhost:5000/api/exam-management/categories/${id}/toggle`, {
         method: 'PATCH',
@@ -183,6 +226,9 @@ const Categories = () => {
       
       if (result.success) {
         loadCategories();
+        showAlertOnce(result.message || 'Status updated', 'success');
+      } else {
+        showAlertOnce(result.message || 'Toggle failed');
       }
     } catch {
       showAlertOnce('Toggle failed');
@@ -190,17 +236,18 @@ const Categories = () => {
   };
 
   const handleRowAction = (category, action) => {
+    const categoryId = category.id ?? category.category_id ?? null;
     if (action === 'edit') {
-      setEditingCategory(category);
+      setEditingCategory({ ...category, id: categoryId });
       setShowModal(true);
       return;
     }
     if (action === 'toggle') {
-      handleToggle(category.id);
+      handleToggle(categoryId);
       return;
     }
     if (action === 'delete') {
-      handleDelete(category.id);
+      handleDelete(categoryId, category.name);
     }
   };
 
@@ -214,16 +261,83 @@ const Categories = () => {
     }));
   };
 
-  const showAlertOnce = (message) => {
-    if (shownAlertsRef.current.has(message)) return;
-    shownAlertsRef.current.add(message);
-    alert(message);
-    setTimeout(() => shownAlertsRef.current.delete(message), 3000);
+  const showAlertOnce = (message, type = 'error') => {
+    setNotice({ message, type });
+    setTimeout(() => setNotice({ message: '', type: '' }), 3000);
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
+        {notice.message && (
+        <div className="fixed top-6 right-6 z-[60] w-[340px] animate-slideIn">
+          <div
+            className={`flex items-start gap-3 bg-white rounded-xl shadow-lg border border-gray-200 px-5 py-4 transition-all duration-300 ${
+              notice.type === "success"
+                ? "border-l-4 border-l-green-500"
+                : "border-l-4 border-l-red-500"
+            }`}
+          >
+            {/* Icon */}
+            <div className={`text-xl ${
+              notice.type === "success" ? "text-green-500" : "text-red-500"
+            }`}>
+              {notice.type === "success" ? "✓" : "⚠"}
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+                {notice.message}
+            </p>
+          </div>
+        </div>
+
+        )}
+
+        {/* Confirmation Modal */}
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+              {/* Modal Header */}
+              <div className="p-6 bg-red-50 border-b border-red-100">
+                <h3 className="text-lg font-bold text-red-900">
+                  {confirmModal.title}
+                </h3>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    if (!confirmModal.isProcessing) {
+                      setConfirmModal({ isOpen: false, title: '', message: '', categoryName: '', categoryId: null, isProcessing: false });
+                    }
+                  }}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500 flex items-center gap-2"
+                >
+                  {confirmModal.isProcessing && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  )}
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">Categories</h1>
@@ -301,7 +415,7 @@ const Categories = () => {
             </div>
           ) : (
             categories.map((cat) => (
-              <div key={cat.id} className="grid grid-cols-4 gap-4 items-center p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
+              <div key={cat.id ?? cat.category_id ?? cat.code} className="grid grid-cols-4 gap-4 items-center p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
                 <div>
                   <span className="inline-flex items-center gap-1 bg-blue-500 text-white px-3 py-1.5 rounded text-sm font-medium">
                         {cat.code}
@@ -531,9 +645,41 @@ const Categories = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
 
 export default Categories;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
