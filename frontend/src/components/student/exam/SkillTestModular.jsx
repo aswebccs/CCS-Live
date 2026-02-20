@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, X, Flag, Send, AlertCircle, Clock } from 'lucide-react';
 
+const SKILL_TEST_LOCK_KEY = 'skill_test_lock';
+
 const SkillTestModular = () => {
   const { testId } = useParams();
   const navigate = useNavigate();
@@ -18,6 +20,8 @@ const SkillTestModular = () => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showBackWarningModal, setShowBackWarningModal] = useState(false);
+  const [showFullscreenWarningModal, setShowFullscreenWarningModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [visitedQuestions, setVisitedQuestions] = useState({});
@@ -36,9 +40,52 @@ const SkillTestModular = () => {
     fetchTestData();
   }, [testId]);
 
+  useEffect(() => {
+    const lockData = sessionStorage.getItem(SKILL_TEST_LOCK_KEY);
+    if (!lockData) {
+      navigate(`/student/skill-test/${testId}`, { replace: true });
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(lockData);
+      if (String(parsed?.testId) !== String(testId) || parsed?.status !== 'in_progress') {
+        navigate(`/student/skill-test/${testId}`, { replace: true });
+      }
+    } catch (e) {
+      sessionStorage.removeItem(SKILL_TEST_LOCK_KEY);
+      navigate(`/student/skill-test/${testId}`, { replace: true });
+    }
+  }, [testId, navigate]);
+
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const isFullscreenActive = () =>
+    Boolean(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+
+  const requestExamFullscreen = async () => {
+    if (isFullscreenActive()) return true;
+    const elem = document.documentElement;
+    const request =
+      elem.requestFullscreen ||
+      elem.webkitRequestFullscreen ||
+      elem.mozRequestFullScreen ||
+      elem.msRequestFullscreen;
+    if (!request) return false;
+    try {
+      await request.call(elem);
+      return true;
+    } catch (err) {
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -61,6 +108,63 @@ const SkillTestModular = () => {
       fetchQuestionsForModule(modules[currentModuleIndex].id);
     }
   }, [currentModuleIndex, modules, allQuestions]);
+
+  useEffect(() => {
+    if (!test) return;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = 'Exam is in progress. Leaving now may submit or lose progress.';
+      return event.returnValue;
+    };
+
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      setShowBackWarningModal(true);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [test]);
+
+  useEffect(() => {
+    if (!test) return;
+    let mounted = true;
+
+    const ensureFullscreen = async () => {
+      const ok = await requestExamFullscreen();
+      if (mounted) setShowFullscreenWarningModal(!ok);
+    };
+
+    const handleFullscreenChange = async () => {
+      if (isFullscreenActive()) {
+        setShowFullscreenWarningModal(false);
+        return;
+      }
+      const ok = await requestExamFullscreen();
+      setShowFullscreenWarningModal(!ok);
+    };
+
+    ensureFullscreen();
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      mounted = false;
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, [test]);
 
   const fetchTestData = async () => {
     try {
@@ -105,14 +209,21 @@ const SkillTestModular = () => {
           module_id: q.module_id,
           question: q.question_text,
           question_type: uiType,
-          option_a: options[0] || '',
-          option_b: options[1] || '',
-          option_c: options[2] || '',
-          option_d: options[3] || '',
+          question_type_code: typeCode,
+          options: Array.isArray(options) && options.length
+            ? options
+            : (typeCode === 'TOF' ? ['True', 'False'] : []),
           starter_code: qd.reference_solution || '',
           _question_data: qd
         };
       });
+
+      const modulesWithQuestions = mappedModules.filter((m) =>
+        mappedQuestions.some((q) => String(q.module_id) === String(m.id))
+      );
+      const safeModules = modulesWithQuestions.length
+        ? modulesWithQuestions
+        : [{ id: 'all', name: 'Questions', module_type: 'GENERAL' }];
 
       setTest({
         id: exam.id,
@@ -120,13 +231,25 @@ const SkillTestModular = () => {
         duration_minutes: exam.duration_minutes || 60,
         passing_percentage: Number(exam.passing_score || 70)
       });
-      setModules(mappedModules);
+      setModules(safeModules);
       setAllQuestions(mappedQuestions);
       setQuestions([]);
       setAnswers({});
       setMarkedForReview({});
       setTimeRemaining((exam.duration_minutes || 60) * 60);
-      setQuestions(mappedQuestions.filter((x) => String(x.module_id) === String(mappedModules[0]?.id)));
+      sessionStorage.setItem(
+        SKILL_TEST_LOCK_KEY,
+        JSON.stringify({
+          testId: String(testId),
+          status: 'in_progress',
+          startedAt: Date.now()
+        })
+      );
+      setQuestions(
+        safeModules[0]?.id === 'all'
+          ? mappedQuestions
+          : mappedQuestions.filter((x) => String(x.module_id) === String(safeModules[0]?.id))
+      );
       setLoading(false);
     } catch (err) {
       console.error('Failed to fetch test:', err);
@@ -137,7 +260,10 @@ const SkillTestModular = () => {
   const fetchQuestionsForModule = async (moduleId) => {
     try {
       const all = allQuestions || [];
-      const filtered = all.filter((q) => String(q.module_id) === String(moduleId));
+      const filtered =
+        moduleId === 'all'
+          ? all
+          : all.filter((q) => String(q.module_id) === String(moduleId));
       setQuestions(filtered);
       setCurrentQuestionIndex(0);
     } catch (err) {
@@ -156,6 +282,27 @@ const SkillTestModular = () => {
       [currentQuestion.id]: option
     }));
     saveAnswer(currentQuestion.id, option);
+  };
+
+  const handleMmaToggle = (questionId, optionIndex) => {
+    setAnswers((prev) => {
+      const prevValue = Array.isArray(prev[questionId]) ? prev[questionId] : [];
+      const hasOption = prevValue.includes(optionIndex);
+      const nextValue = hasOption
+        ? prevValue.filter((i) => i !== optionIndex)
+        : [...prevValue, optionIndex];
+
+      if (nextValue.length === 0) {
+        const clone = { ...prev };
+        delete clone[questionId];
+        return clone;
+      }
+
+      return {
+        ...prev,
+        [questionId]: nextValue,
+      };
+    });
   };
 
   const handleMarkForReview = () => {
@@ -216,7 +363,15 @@ const SkillTestModular = () => {
         const userAns = answers[q.id];
 
         if (typeCode === 'MSA' || typeCode === 'TOF') {
-          if (String(userAns || '').trim().toLowerCase() === String(qd.correct_answer || '').trim().toLowerCase()) score += 1;
+          const normalizedUser = String(userAns || '').trim().toLowerCase();
+          const normalizedCorrect = String(qd.correct_answer || '').trim().toLowerCase();
+          if (normalizedUser === normalizedCorrect) {
+            score += 1;
+            return;
+          }
+          if (Number.isInteger(qd.correct_index) && normalizedUser === String(qd.correct_index)) {
+            score += 1;
+          }
           return;
         }
 
@@ -256,8 +411,11 @@ const SkillTestModular = () => {
         { headers: getAuthHeaders() }
       );
 
+      sessionStorage.removeItem(SKILL_TEST_LOCK_KEY);
+
       navigate('/student/skill-test/result', {
         state: {
+          examId: Number(testId),
           score,
           totalQuestions,
           percentage,
@@ -268,6 +426,7 @@ const SkillTestModular = () => {
     } catch (err) {
       console.error('Failed to submit test:', err);
       if (err?.response?.status === 409) {
+        sessionStorage.removeItem(SKILL_TEST_LOCK_KEY);
         alert('You have already attempted this exam.');
         navigate('/student/skill-test');
       } else {
@@ -329,7 +488,7 @@ const SkillTestModular = () => {
   if (questions.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p>Loading questions...</p>
+        <p>No questions found for this exam.</p>
       </div>
     );
   }
@@ -344,9 +503,9 @@ const SkillTestModular = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-blue-600 sticky top-0 z-10 shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold text-white truncate">{test.title}</h1>
+              <h1 className="text-base sm:text-lg font-bold text-white truncate">{test.title}</h1>
               <p className="text-xs text-blue-100">Skill Assessment Test</p>
             </div>
 
@@ -367,7 +526,7 @@ const SkillTestModular = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="lg:col-span-3 space-y-4">
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-6 pb-4 border-b">
@@ -396,7 +555,7 @@ const SkillTestModular = () => {
               </div>
 
               <div className="mb-4 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                <span className="font-semibold">{currentModule?.name}</span> | {currentModule?.module_type.replace('_', ' ')}
+                <span className="font-semibold">{currentModule?.name}</span>
               </div>
 
               <div className="mb-6">
@@ -407,32 +566,62 @@ const SkillTestModular = () => {
 
               <div className="space-y-3 mb-6">
                 {currentQuestion.question_type === 'MCQ' && (
-                  ['A', 'B', 'C', 'D'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => handleAnswerSelect(option)}
-                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                        answers[currentQuestion.id] === option
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
-                            answers[currentQuestion.id] === option
-                              ? 'bg-blue-600 border-blue-600 text-white'
-                              : 'border-gray-300 text-gray-600'
+                  (currentQuestion.options || []).map((optionText, idx) => {
+                    const label = String.fromCharCode(65 + idx);
+                    const isMma = currentQuestion.question_type_code === 'MMA';
+                    const isChecked = isMma
+                      ? (Array.isArray(answers[currentQuestion.id]) && answers[currentQuestion.id].includes(idx))
+                      : answers[currentQuestion.id] === optionText;
+
+                    if (isMma) {
+                      return (
+                        <label
+                          key={`${label}-${idx}`}
+                          className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                            isChecked
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                           }`}
                         >
-                          {option}
+                          <input
+                            type="checkbox"
+                            checked={Boolean(isChecked)}
+                            onChange={() => handleMmaToggle(currentQuestion.id, idx)}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center font-semibold text-sm flex-shrink-0 border-gray-300 text-gray-600">
+                            {label}
+                          </div>
+                          <span className="text-sm text-gray-800 flex-1">{optionText}</span>
+                        </label>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={`${label}-${idx}`}
+                        onClick={() => handleAnswerSelect(optionText)}
+                        className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                          isChecked
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
+                              isChecked
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'border-gray-300 text-gray-600'
+                            }`}
+                          >
+                            {label}
+                          </div>
+                          <span className="text-sm text-gray-800 flex-1">{optionText}</span>
                         </div>
-                        <span className="text-sm text-gray-800 flex-1">
-                          {currentQuestion[`option_${option.toLowerCase()}`]}
-                        </span>
-                      </div>
-                    </button>
-                  ))
+                      </button>
+                    );
+                  })
                 )}
 
                 {currentQuestion.question_type === 'FILL_BLANK' && (
@@ -622,8 +811,61 @@ const SkillTestModular = () => {
           </div>
         </div>
       )}
+
+      {showBackWarningModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+            <div className="p-6 bg-red-50 border-b border-red-100">
+              <h3 className="text-lg font-bold text-red-900">Warning</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 text-sm leading-relaxed">
+                Exam is in progress. You cannot go back until you submit the test.
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setShowBackWarningModal(false)}
+                className="px-4 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-red-500 hover:bg-red-600"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFullscreenWarningModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="p-6 bg-yellow-50 border-b border-yellow-100">
+              <h3 className="text-lg font-bold text-yellow-900">Fullscreen Required</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 text-sm leading-relaxed">
+                This exam must be taken in fullscreen mode. Click below to continue.
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={async () => {
+                  const ok = await requestExamFullscreen();
+                  setShowFullscreenWarningModal(!ok);
+                }}
+                className="px-4 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-blue-600 hover:bg-blue-700"
+              >
+                Enter Fullscreen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default SkillTestModular;
+
+
+
+

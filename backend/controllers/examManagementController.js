@@ -37,7 +37,7 @@ exports.listCategories = async (req, res) => {
         const searchName = req.query.search_name ?? req.query.name;
         const { status } = req.query;
 
-        const where = [];
+        const where = ["is_deleted = FALSE"];
         const values = [];
 
         if (searchCode) {
@@ -192,6 +192,80 @@ exports.deleteCategory = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
+            "UPDATE categories SET is_deleted = TRUE, deleted_at = NOW() WHERE id = $1 AND is_deleted = FALSE RETURNING id",
+            [id]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ success: false, message: "Category not found" });
+        }
+
+        return res.json({ success: true, message: "Category moved to trash", data: { id } });
+    } catch (err) {
+        console.error("DELETE CATEGORY ERROR:", err.message);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+exports.listTrashCategories = async (req, res) => {
+    try {
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+        const offset = (page - 1) * limit;
+
+        const countRes = await pool.query(
+            "SELECT COUNT(*) FROM categories WHERE is_deleted = TRUE"
+        );
+        const total = parseInt(countRes.rows[0].count, 10);
+        const totalPages = Math.ceil(total / limit);
+
+        const listRes = await pool.query(
+            `
+            SELECT
+                id, code, name, short_description, description,
+                is_active, created_at, deleted_at
+            FROM categories
+            WHERE is_deleted = TRUE
+            ORDER BY deleted_at DESC
+            LIMIT $1 OFFSET $2
+            `,
+            [limit, offset]
+        );
+
+        res.json({
+            success: true,
+            data: listRes.rows,
+            pagination: { page, limit, total, totalPages },
+        });
+    } catch (err) {
+        console.error("LIST TRASH CATEGORIES ERROR:", err.message);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+exports.restoreCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            "UPDATE categories SET is_deleted = FALSE, deleted_at = NULL WHERE id = $1 AND is_deleted = TRUE RETURNING id, code, name",
+            [id]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ success: false, message: "Category not found in trash" });
+        }
+
+        return res.json({ success: true, message: "Category restored", data: result.rows[0] });
+    } catch (err) {
+        console.error("RESTORE CATEGORY ERROR:", err.message);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+exports.permanentDeleteCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
             "DELETE FROM categories WHERE id = $1 RETURNING id",
             [id]
         );
@@ -200,9 +274,9 @@ exports.deleteCategory = async (req, res) => {
             return res.status(404).json({ success: false, message: "Category not found" });
         }
 
-        return res.json({ success: true, data: { id } });
+        return res.json({ success: true, message: "Category permanently deleted", data: { id } });
     } catch (err) {
-        console.error("DELETE CATEGORY ERROR:", err.message);
+        console.error("PERMANENT DELETE CATEGORY ERROR:", err.message);
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
@@ -244,7 +318,7 @@ exports.listSubcategories = async (req, res) => {
         const searchName = req.query.search_name ?? req.query.name;
         const { status, category_id } = req.query;
 
-        const where = [];
+        const where = ["s.is_deleted = FALSE"];
         const values = [];
 
         if (searchCode) {
@@ -404,7 +478,7 @@ exports.deleteSubcategory = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "DELETE FROM subcategories WHERE id = $1 RETURNING id",
+            "UPDATE subcategories SET is_deleted = TRUE, deleted_at = NOW() WHERE id = $1 AND is_deleted = FALSE RETURNING id",
             [id]
         );
 
@@ -412,7 +486,7 @@ exports.deleteSubcategory = async (req, res) => {
             return res.status(404).json({ success: false, message: "Subcategory not found" });
         }
 
-        return res.json({ success: true, data: { id } });
+        return res.json({ success: true, message: "Subcategory moved to trash", data: { id } });
     } catch (err) {
         console.error("DELETE SUBCATEGORY ERROR:", err.message);
         return res.status(500).json({ success: false, message: "Server error" });
@@ -456,7 +530,7 @@ exports.listExams = async (req, res) => {
         const searchTitle = req.query.search_title ?? req.query.title;
         const { status, exam_type, level_id, subcategory_id, category_id, language } = req.query;
 
-        const where = [];
+        const where = ["e.is_deleted = FALSE"];
         const values = [];
 
         if (searchCode) {
@@ -722,7 +796,7 @@ exports.deleteExam = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "DELETE FROM exams WHERE id = $1 RETURNING id",
+            "UPDATE exams SET is_deleted = TRUE, deleted_at = NOW() WHERE id = $1 AND is_deleted = FALSE RETURNING id",
             [id]
         );
 
@@ -730,7 +804,7 @@ exports.deleteExam = async (req, res) => {
             return res.status(404).json({ success: false, message: "Exam not found" });
         }
 
-        return res.json({ success: true, data: { id } });
+        return res.json({ success: true, message: "Exam moved to trash", data: { id } });
     } catch (err) {
         console.error("DELETE EXAM ERROR:", err.message);
         return res.status(500).json({ success: false, message: "Server error" });
@@ -900,7 +974,7 @@ exports.listExamQuestions = async (req, res) => {
             `
             SELECT id, exam_id, module_id, question_text, marks, difficulty, explanation, question_data, display_order, is_active, created_at, updated_at
             FROM exam_questions
-            WHERE exam_id = $1
+            WHERE exam_id = $1 AND is_deleted = FALSE
             ORDER BY display_order ASC
             `,
             [examId]
@@ -1159,6 +1233,77 @@ exports.submitExamAttempt = async (req, res) => {
             ]
         );
 
+        // Auto-generate certificate if exam passed
+        if (passed) {
+            try {
+                // Get user details
+                const userRes = await pool.query(
+                    `SELECT name FROM users WHERE id = $1`,
+                    [userId]
+                );
+                
+                // Get exam details
+                const examRes = await pool.query(
+                    `SELECT title FROM exams WHERE id = $1`,
+                    [examId]
+                );
+
+                if (userRes.rows.length && examRes.rows.length) {
+                    const studentName = userRes.rows[0].name;
+                    const examTitle = examRes.rows[0].title;
+                    
+                    // Generate certificate directly using database insert
+                    try {
+                        // Puppeteer certificate generation (non-blocking in background)
+                        const { generateCertificatePdf } = require('./certificateController');
+                        
+                        const mockReq = {
+                            body: {
+                                student_name: studentName,
+                                exam_title: examTitle,
+                                issuer_name: 'CCS Institute',
+                                student_id: userId,
+                                exam_id: examId
+                            },
+                            protocol: process.env.BACKEND_PROTOCOL || 'http',
+                            get: (header) => {
+                                if (header === 'host') return process.env.BACKEND_HOST || `localhost:${process.env.PORT || 5000}`;
+                                return '';
+                            }
+                        };
+
+                        let certificateGenerated = false;
+                        let certificateData = null;
+
+                        const mockRes = {
+                            status: (code) => ({
+                                json: (data) => {
+                                    if (code >= 200 && code < 300) {
+                                        certificateGenerated = true;
+                                        certificateData = data;
+                                    }
+                                }
+                            }),
+                            json: (data) => {
+                                certificateGenerated = true;
+                                certificateData = data;
+                            }
+                        };
+
+                        // Generate certificate in background
+                        generateCertificatePdf(mockReq, mockRes).catch((err) => {
+                            console.error('Certificate generation failed:', err.message);
+                        });
+                    } catch (certErr) {
+                        console.error('Certificate generation error:', certErr.message);
+                    }
+                }
+            } catch (certErr) {
+                console.error('Error in certificate generation process:', certErr.message);
+                // Don't fail the exam attempt if certificate generation fails
+            }
+        }
+
         return res.status(201).json({ success: true, data: result.rows[0] });
     } catch (err) {
         if (err.code === "23505") {
@@ -1248,3 +1393,6 @@ exports.listExamAttempts = async (req, res) => {
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
+// Add these soft delete functions
+const softDeleteFunctions = require('./softDeleteFunctions');
+Object.assign(exports, softDeleteFunctions);

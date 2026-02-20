@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Save, X } from 'lucide-react';
+import { Plus, Save, X } from 'lucide-react';
+import { API_ENDPOINTS } from '../../../config/api';
 
 const QUESTION_TYPE_FALLBACK = [
   { code: 'MSA', name: 'Multiple Choice Single Answer', is_active: true },
@@ -23,6 +24,9 @@ const QUESTION_TYPE_TO_MODULE = {
 };
 
 const Questions = ({ examId, examTitle, levelName, onComplete }) => {
+  const getExamId = (exam) => exam?.id ?? exam?.exam_id ?? '';
+  const getQuestionId = (question) => question?.id ?? question?.question_id ?? null;
+
   const getAuthHeaders = (includeJson = false) => {
     const token = localStorage.getItem('token');
     return {
@@ -55,6 +59,15 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
   const [editingQuestionId, setEditingQuestionId] = useState(null);
   const [previewQuestion, setPreviewQuestion] = useState(null);
   const [showPreviewOptions, setShowPreviewOptions] = useState(false);
+  const [notice, setNotice] = useState({ type: '', message: '' });
+  const [confirmModal, setConfirmModal] = useState({ 
+    isOpen: false, 
+    title: '', 
+    message: '', 
+    questionText: '',
+    questionId: null,
+    isProcessing: false
+  });
 
   const [currentQuestion, setCurrentQuestion] = useState({
     moduleId: '',
@@ -111,19 +124,28 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
     }
   };
 
+  
   const getModuleByQuestionType = (questionTypeCode) => {
     const moduleType = getMappedModuleType(questionTypeCode);
     return questionModules.find((m) => m.module_type === moduleType);
   };
+
+  const showNotice = (message, type = 'error') => {
+    setNotice({ type, message });
+    setTimeout(() => setNotice({ type: '', message: '' }), 3000);
+  };
+
+  const alert = (message) => showNotice(message, 'error');
 
   const loadExams = async () => {
     try {
       const response = await fetch('http://localhost:5000/api/exam-management/exams?page=1&limit=200');
       const result = await response.json();
       if (!result.success) return;
-      setExams(result.data);
+      const normalizedExams = (result.data || []).map((e) => ({ ...e, id: getExamId(e) }));
+      setExams(normalizedExams);
       if (selectedExamId) {
-        const selected = result.data.find((e) => String(e.id) === String(selectedExamId));
+        const selected = normalizedExams.find((e) => String(getExamId(e)) === String(selectedExamId));
         if (selected) {
           setSelectedExamInfo({
             code: selected.code || '',
@@ -132,9 +154,9 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
           });
         }
       }
-      if (!selectedExamId && result.data.length > 0) {
-        const first = result.data[0];
-        setSelectedExamId(first.id);
+      if (!selectedExamId && normalizedExams.length > 0) {
+        const first = normalizedExams[0];
+        setSelectedExamId(String(getExamId(first)));
         setSelectedExamInfo({ code: first.code || '', title: first.title, levelName: first.level_name || '' });
       }
     } catch (error) {
@@ -181,7 +203,14 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
       setLoading(true);
       const response = await fetch(`http://localhost:5000/api/exam-management/exams/${examIdParam}/questions`);
       const result = await response.json();
-      if (result.success) setQuestions(result.data);
+      if (result.success) {
+        const normalizedQuestions = (result.data || []).map((q) => ({
+          ...q,
+          id: getQuestionId(q),
+          moduleId: q.moduleId ?? q.module_id ?? '',
+        }));
+        setQuestions(normalizedQuestions);
+      }
     } catch (error) {
       console.error('Error loading exam questions:', error);
     } finally {
@@ -396,8 +425,56 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
     return true;
   };
 
-  const handleDeleteQuestion = (questionId) => {
-    setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+  const handleDeleteQuestion = (questionId, questionText) => {
+    if (!confirmedExamId) {
+      alert('Please confirm exam first');
+      return;
+    }
+    if (!questionId) {
+      showNotice('Invalid question id. Please refresh and try again.', 'error');
+      return;
+    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Question',
+      message: `Are you sure you want to delete this question? It will be moved to the Recycle Bin where you can restore or permanently delete it.`,
+      questionText: questionText,
+      questionId: questionId,
+      isProcessing: false
+    });
+  };
+
+  const handleConfirmDeleteQuestion = async () => {
+    const questionId = confirmModal.questionId;
+    if (!confirmedExamId) {
+      alert('Please confirm exam first');
+      return;
+    }
+    if (!questionId) {
+      showNotice('Invalid question id. Please refresh and try again.', 'error');
+      return;
+    }
+    try {
+      setConfirmModal(prev => ({ ...prev, isProcessing: true }));
+      const res = await fetch(
+        API_ENDPOINTS.QUESTION_DELETE_IN_EXAM(confirmedExamId, questionId),
+        { method: 'DELETE', headers: getAuthHeaders() }
+      );
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.message || `HTTP ${res.status}`);
+      if (result.success) {
+        setConfirmModal({ isOpen: false, title: '', message: '', questionText: '', questionId: null, isProcessing: false });
+        await loadExamQuestions(confirmedExamId);
+        showNotice('Question deleted and moved to trash', 'success');
+      } else {
+        showNotice(result.message || 'Failed to delete question', 'error');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      showNotice(error.message || 'Error deleting question. Please try again.', 'error');
+    } finally {
+      setConfirmModal(prev => ({ ...prev, isProcessing: false }));
+    }
   };
 
   const isTempQuestion = (id) => String(id).startsWith('temp_');
@@ -406,7 +483,7 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
     const qData = question.questionData || question.question_data || {};
     const typeCode = qData.question_type_code || '';
     const options = qData.options || ['', '', '', ''];
-    const normalizedOptions = [...options, '', '', '', ''].slice(0, 4);
+    const normalizedOptions = options.length ? options : ['', '', '', ''];
 
     setCurrentQuestion({
       moduleId: String(question.moduleId || question.module_id || ''),
@@ -529,11 +606,12 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
       }
 
       await loadExamQuestions(confirmedExamId);
-      alert(`Exam questions saved for ${selectedExamInfo.title || 'selected exam'}`);
+      showNotice(`Exam questions saved for ${selectedExamInfo.title || 'selected exam'}`, 'success');
+
       if (onComplete) onComplete({ success: true });
     } catch (error) {
       console.error('Error saving exam:', error);
-      alert('Failed to save exam');
+      showNotice(error.message || 'Failed to save exam');
     } finally {
       setSaving(false);
     }
@@ -550,6 +628,75 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
   return (
     <div className="min-h-screen bg-gray-100 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
+        {notice.message && (
+        <div className="fixed top-6 right-6 z-[60] w-[340px] animate-slideIn">
+          <div
+            className={`flex items-start gap-3 bg-white rounded-xl shadow-lg border border-gray-200 px-5 py-4 transition-all duration-300 ${
+              notice.type === "success"
+                ? "border-l-4 border-l-green-500"
+                : "border-l-4 border-l-red-500"
+            }`}
+          >
+            {/* Icon */}
+            <div className={`text-xl ${
+              notice.type === "success" ? "text-green-500" : "text-red-500"
+            }`}>
+              {notice.type === "success" ? "✓" : "⚠"}
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+                {notice.message}
+            </p>
+          </div>
+        </div>
+
+        )}
+
+        {/* Confirmation Modal */}
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+              {/* Modal Header */}
+              <div className="p-6 bg-red-50 border-b border-red-100">
+                <h3 className="text-lg font-bold text-red-900">
+                  {confirmModal.title}
+                </h3>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    if (!confirmModal.isProcessing) {
+                      setConfirmModal({ isOpen: false, title: '', message: '', questionText: '', questionId: null, isProcessing: false });
+                    }
+                  }}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDeleteQuestion}
+                  disabled={confirmModal.isProcessing}
+                  className="px-4 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500 flex items-center gap-2"
+                >
+                  {confirmModal.isProcessing && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  )}
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           {isExamLockedContext || confirmedExamId ? (
             <>
@@ -572,7 +719,7 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
                   onChange={(e) => {
                     const id = e.target.value;
                     setSelectedExamId(id);
-                    const found = exams.find((x) => String(x.id) === String(id));
+                    const found = exams.find((x) => String(getExamId(x)) === String(id));
                     setSelectedExamInfo({ code: found?.code || '', title: found?.title || '', levelName: found?.level_name || '' });
                     setQuestionModules([]);
                     setQuestions([]);
@@ -582,7 +729,7 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
                 >
                   <option value="">Select Exam</option>
                   {exams.map((exam) => (
-                    <option key={exam.id} value={exam.id}>
+                    <option key={getExamId(exam) || exam.code} value={getExamId(exam)}>
                       {exam.title} ({exam.level_name || 'Level'})
                     </option>
                   ))}
@@ -657,7 +804,7 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
             <div className="p-8 text-center text-gray-500">No questions added yet</div>
           ) : (
             questions.map((question) => (
-              <div key={question.id} className="grid grid-cols-6 gap-4 items-center p-4 border-b border-gray-200">
+              <div key={getQuestionId(question) || question.question_text} className="grid grid-cols-6 gap-4 items-center p-4 border-b border-gray-200">
                 <div className="text-sm text-gray-700">
                   {(selectedExamInfo.code || '-')} - {(selectedExamInfo.title || '-')}
                 </div>
@@ -680,9 +827,7 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
                       } else if (action === 'edit') {
                         handleEditQuestion(question);
                       } else if (action === 'delete') {
-                        if (window.confirm('Delete this question?')) {
-                          handleDeleteQuestion(question.id);
-                        }
+                        handleDeleteQuestion(getQuestionId(question), question.questionText || question.question_text);
                       }
                       e.target.value = '';
                     }}
@@ -791,7 +936,17 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
 
               {['MSA', 'MMA'].includes(currentQuestion.questionTypeCode) && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Options</label>
+                    <button
+                      type="button"
+                      title="Add option"
+                      onClick={() => setCurrentQuestion({ ...currentQuestion, mcqOptions: [...currentQuestion.mcqOptions, ''] })}
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {currentQuestion.mcqOptions.map((opt, idx) => (
                       <input
@@ -1022,9 +1177,25 @@ const Questions = ({ examId, examTitle, levelName, onComplete }) => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
 
 export default Questions;
-
